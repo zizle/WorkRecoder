@@ -5,6 +5,8 @@
 
 import time
 import hashlib
+import random
+import string
 from jose import jwt, JWTError
 from settings import SECRET_KEY, TOKEN_EXPIRES
 
@@ -37,4 +39,10 @@ def decipher_user_token(token: str):
     except JWTError:
         return None, None
     return user_id, access
+
+
+def genetate_user_fixed_code():
+    """ 生成用户的fixed_code """
+    return 'User_' + ''.join(random.sample(string.ascii_letters, 10))
+
 

@@ -5,7 +5,8 @@
 
 # 1. 用户使用账号密码登录
 # 2. 用户使用token登录
-# 3. 管理关联用户的列表
+# 3. 管理用户的列表
+# 4. 添加一个用户
 #
 
 import datetime
@@ -13,9 +14,9 @@ from fastapi import APIRouter, Query, Body, HTTPException
 
 from db import DBWorker
 from settings import APP_HOST
-from utils.encryption import encrypt_password, generate_user_token, decipher_user_token
+from utils.encryption import encrypt_password, generate_user_token, decipher_user_token, genetate_user_fixed_code
 from utils.constants import ORGANIZATIONS
-from .validate_models import UserLoginItem
+from .validate_models import UserLoginItem, UserAddedItem
 
 user_api = APIRouter()
 
@@ -68,7 +69,7 @@ async def user_information(token: str = Query(...)):
     }
 
 
-@user_api.get('/list/')
+@user_api.get('/list/')  # 管理员获取用户列表
 async def user_list(token: str = Query(...)):
     # 解析token
     user_id, access = decipher_user_token(token)
@@ -88,6 +89,32 @@ async def user_list(token: str = Query(...)):
         user_item['update_time'] = datetime.datetime.fromtimestamp(user_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['organization_name'] = ORGANIZATIONS.get(user_item['organization'], '未知')
     return {'message': '获取用户列表成功!', 'users': users}
+
+
+@user_api.post('/add/')  # 添加一个用户
+async def add_user(user_item: UserAddedItem = Body(...)):
+    # 验证添加这是否为管理员
+    operate_id, access = decipher_user_token(user_item.operate_token)
+    if 'admin' in access:
+        raise HTTPException(status_code=403, detail='您没有权限进行此操作!')
+    int_timestamp = int(datetime.datetime.now().timestamp())
+    new_user = {
+        'join_time': int_timestamp,
+        'update_time': int_timestamp,
+        'username': user_item.username,
+        'fixed_code': genetate_user_fixed_code(),
+        'password': encrypt_password(user_item.password),
+        'phone': user_item.phone,
+        'organization': user_item.organization
+    }
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "INSERT INTO user_user (join_time,update_time,username,fixed_code,password,phone,organization) "
+            "VALUES (%(join_time)s,%(update_time)s,%(username)s,%(fixed_code)s,%(password)s,%(phone)s,"
+            "%(organization)s);",
+            new_user
+        )
+    return {'message': '创建新用户成功!'}
 
 
 @user_api.get('/message/count/')  # 用户的未读消息数
