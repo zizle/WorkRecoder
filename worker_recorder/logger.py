@@ -1,0 +1,30 @@
+# _*_ coding:utf-8 _*_
+
+import os
+import time
+import logging
+
+from settings import APP_DIR
+
+
+# 日志记录
+def logger_handler(app_dir, log_level):
+    # 日志配置
+    log_folder = os.path.join(app_dir, "logs/")
+    if not os.path.exists(log_folder):
+        os.makedirs(log_folder)
+    log_file_name = time.strftime('%Y-%m-%d', time.localtime(time.time())) + '.log'
+    log_file_path = log_folder + os.sep + log_file_name
+
+    handler = logging.FileHandler(log_file_path, encoding='UTF-8')
+    handler.setLevel(log_level)
+    logger_format = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s - %(pathname)s[line:%(lineno)d]"
+    )
+    handler.setFormatter(logger_format)
+    return handler
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(logger_handler(app_dir=APP_DIR, log_level=logging.INFO))
