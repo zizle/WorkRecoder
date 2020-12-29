@@ -95,7 +95,7 @@ async def user_list(token: str = Query(...)):
 async def add_user(user_item: UserAddedItem = Body(...)):
     # 验证添加这是否为管理员
     operate_id, access = decipher_user_token(user_item.operate_token)
-    if 'admin' in access:
+    if 'admin' not in access:
         raise HTTPException(status_code=403, detail='您没有权限进行此操作!')
     int_timestamp = int(datetime.datetime.now().timestamp())
     new_user = {
@@ -114,6 +114,7 @@ async def add_user(user_item: UserAddedItem = Body(...)):
             "%(organization)s);",
             new_user
         )
+        # new_user_id = cursor.lastrowid
     return {'message': '创建新用户成功!'}
 
 

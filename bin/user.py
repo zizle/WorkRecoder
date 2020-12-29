@@ -2,7 +2,7 @@
 # @File  : user.py
 # @Time  : 2020-12-28 15:58
 # @Author: zizle
-import datetime
+
 from worker_recorder.db import DBWorker
 
 
@@ -16,7 +16,7 @@ def create_user_table():
             "`username` VARCHAR(32) NOT NULL COMMENT '用户名',"
             "`fixed_code` VARCHAR(20) NOT NULL COMMENT '用户号',"
             "`password` VARCHAR(32) NOT NULL COMMENT 'hash密码',"
-            "`phone` CHAR(11) NOT NULL COMMENT '手机号',"
+            "`phone` CHAR(11) NOT NULL UNIQUE COMMENT '手机号',"
             "`email` VARCHAR(64) DEFAULT '' COMMENT '邮箱',"
             "`organization` INT NOT NULL DEFAULT 0,"
             "`is_admin` BIT NOT NULL DEFAULT 0,"
