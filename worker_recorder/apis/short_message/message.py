@@ -4,6 +4,9 @@
 # @Author: zizle
 
 # 1. 用户上传短讯通文件数据
+# 2. 用户删除自己的一条短讯通或管理员删除一条短讯通
+# 3. 用户获取自己的短讯通数据(分页)
+
 import datetime
 
 import pandas as pd
@@ -81,7 +84,6 @@ async def excel_short_message(excel_file: UploadFile = Form(...), user_token: st
 
 @message_api.delete('/{msg_id}/')  # 删除一条短信通
 async def delete_short_message(msg_id: int, user_token: str = Query(...)):
-    print(msg_id)
     user_id, access = decipher_user_token(user_token)
     is_admin = 1 if 'admin' in access else 0
     # 删除数据
@@ -93,4 +95,25 @@ async def delete_short_message(msg_id: int, user_token: str = Query(...)):
     return {'message': '删除成功!'}
 
 
+@message_api.get('/')  # 用户分页获取自己的短讯通数据
+async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), page_size: int = Query(1, ge=1)):
+    user_id, _ = decipher_user_token(user_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='登录过期了!')
+    # 分页查询数据
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "SELECT id,create_time,update_time,content,msg_type,effects,note,audit_mind,is_active "
+            "FROM work_short_message WHERE author_id=%s ORDER BY create_time DESC LIMIT %s,%s;",
+            (user_id, (page - 1) * page_size, page_size)
+        )
+        messages = cursor.fetchall()
+        # 查询总数量
+        cursor.execute("SELECT count(id) as total_count FROM work_short_message WHERE author_id=%s;", (user_id, ))
+        total_obj = cursor.fetchone()
+        total_count = total_obj['total_count'] if total_obj['total_count'] else 0
+    for m_item in messages:
+        m_item['create_time'] = datetime.datetime.fromtimestamp(m_item['create_time']).strftime('%Y-%m-%d')
+        m_item['update_time'] = datetime.datetime.fromtimestamp(m_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
+    return {'message': '获取数据成功!', 'messages': messages, 'page': page, 'total_count': total_count}
 
