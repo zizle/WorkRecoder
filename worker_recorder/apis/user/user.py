@@ -7,7 +7,7 @@
 # 2. 用户使用token登录
 # 3. 管理用户的列表
 # 4. 添加一个用户
-#
+# 5. 设置一个用户的模块管理权限
 
 import datetime
 from fastapi import APIRouter, Query, Body, HTTPException
@@ -26,7 +26,7 @@ async def user_login(user_data: UserLoginItem = Body(...)):
     # 查询用户及密码
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,fixed_code,phone,password,is_admin,is_active FROM user_user WHERE phone=%s OR fixed_code=%s;",
+            "SELECT id,fixed_code,phone,password,access,is_active FROM user_user WHERE phone=%s OR fixed_code=%s;",
             (user_data.username, user_data.username)
         )
         user = cursor.fetchone()
@@ -38,7 +38,8 @@ async def user_login(user_data: UserLoginItem = Body(...)):
     if user['password'] != encrypt_password(user_data.password):
         raise HTTPException(status_code=401, detail='用户名或密码错误!')
     # 生成token
-    access = ['admin', 'normal'] if user['is_admin'] else ['normal']
+    access = user['access'].split('-') if user['access'] else []
+    print('access:', access)
     user_token = generate_user_token({'user_id': user['id'], 'access': access})
     return {'message': '登录成功!', 'token': user_token}
 
@@ -52,7 +53,7 @@ async def user_information(token: str = Query(...)):
     # 查询用户信息
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,username,is_admin FROM user_user WHERE id=%s AND is_active=1;",
+            "SELECT id,username,access FROM user_user WHERE id=%s AND is_active=1;",
             (user_id, )
         )
         user = cursor.fetchone()
@@ -65,7 +66,7 @@ async def user_information(token: str = Query(...)):
         'avatar': '{}static/user_avatar.png'.format(APP_HOST),
         'name': user['username'],
         'user_id': user_id,
-        'access': access
+        'access': user['access'].split('-')
     }
 
 
@@ -80,14 +81,15 @@ async def user_list(token: str = Query(...)):
     # 查询用户列表
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,username,fixed_code,join_time,update_time,phone,email,is_admin,is_active,organization "
-            "FROM user_user;"
+            "SELECT id,username,fixed_code,join_time,update_time,phone,email,access,is_active,organization "
+            "FROM user_user WHERE id>1;"
         )
         users = cursor.fetchall()
     for user_item in users:
         user_item['join_time'] = datetime.datetime.fromtimestamp(user_item['join_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['update_time'] = datetime.datetime.fromtimestamp(user_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['organization_name'] = ORGANIZATIONS.get(user_item['organization'], '未知')
+        user_item['access'] = user_item['access'].split('-')
     return {'message': '获取用户列表成功!', 'users': users}
 
 
@@ -116,6 +118,25 @@ async def add_user(user_item: UserAddedItem = Body(...)):
         )
         # new_user_id = cursor.lastrowid
     return {'message': '创建新用户成功!'}
+
+
+@user_api.post('/access/')   # 设置一个用户的权限
+async def set_user_access(user_id: int = Body(..., embed=True),
+                          user_access: list = Body(..., embed=True),
+                          user_token: str = Query(...)):
+    user_access = list(filter(lambda x: True if x else False, user_access))
+    operate_id, access = decipher_user_token(user_token)
+    if not operate_id:
+        raise HTTPException(status_code=401, detail='登录过期了')
+    if 'admin' not in access:
+        raise HTTPException(status_code=403, detail='您不能这样做!')
+    # 设置权限
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "UPDATE user_user SET access=%s WHERE id=%s;",
+            ('-'.join(user_access), user_id)
+        )
+    return {'message': '设置成功!'}
 
 
 @user_api.get('/message/count/')  # 用户的未读消息数

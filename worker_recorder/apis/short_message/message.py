@@ -10,14 +10,24 @@
 import datetime
 
 import pandas as pd
-from fastapi import APIRouter, UploadFile, Form, HTTPException, Query
+from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Body
 
 from db import DBWorker
 from utils.encryption import decipher_user_token
 from utils.file_hands import date_column_converter
+from utils.constants import MSG_AUDIT_MIND
 from logger import logger
+from .validate_models import AuditMsgBodyItem
 
 message_api = APIRouter()
+
+
+# 处理短讯通返回数据的内容
+def handler_message_content(m_item):
+    m_item['create_time'] = datetime.datetime.fromtimestamp(m_item['create_time']).strftime('%Y-%m-%d')
+    m_item['update_time'] = datetime.datetime.fromtimestamp(m_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
+    m_item['audit_description'] = '审核意见：{}'.format(MSG_AUDIT_MIND.get(m_item['audit_mind'], '无'))
+    return m_item
 
 
 @message_api.post('/excel/')
@@ -82,19 +92,6 @@ async def excel_short_message(excel_file: UploadFile = Form(...), user_token: st
     return {'message': '上传数据成功!新增{}条。'.format(len(message_saved)), 'messages': message_saved}
 
 
-@message_api.delete('/{msg_id}/')  # 删除一条短信通
-async def delete_short_message(msg_id: int, user_token: str = Query(...)):
-    user_id, access = decipher_user_token(user_token)
-    is_admin = 1 if 'admin' in access else 0
-    # 删除数据
-    with DBWorker() as (_, cursor):
-        cursor.execute(
-            "DELETE FROM work_short_message WHERE id=%s AND IF(1=%s,TRUE,author_id=%s);",
-            (msg_id, is_admin, user_id)
-        )
-    return {'message': '删除成功!'}
-
-
 @message_api.get('/')  # 用户分页获取自己的短讯通数据
 async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), page_size: int = Query(1, ge=1)):
     user_id, _ = decipher_user_token(user_token)
@@ -112,8 +109,64 @@ async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), 
         cursor.execute("SELECT count(id) as total_count FROM work_short_message WHERE author_id=%s;", (user_id, ))
         total_obj = cursor.fetchone()
         total_count = total_obj['total_count'] if total_obj['total_count'] else 0
-    for m_item in messages:
-        m_item['create_time'] = datetime.datetime.fromtimestamp(m_item['create_time']).strftime('%Y-%m-%d')
-        m_item['update_time'] = datetime.datetime.fromtimestamp(m_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
+    messages = list(map(handler_message_content, messages))
     return {'message': '获取数据成功!', 'messages': messages, 'page': page, 'total_count': total_count}
 
+
+@message_api.post('/audit/')  # 管理员审核短讯通数据
+async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
+    operate_id, access = decipher_user_token(body_item.user_token)
+    if not operate_id:
+        raise HTTPException(status_code=401, detail='登录过期!')
+    if 'admin' not in access and 'short_message' not in access:
+        raise HTTPException(status_code=403, detail='不能这样操作!')
+    # 处理时间区域
+    try:
+        start_date = int(datetime.datetime.strptime(body_item.start_date, '%Y-%m-%d').timestamp())
+        end_date = int(datetime.datetime.strptime(body_item.end_date, '%Y-%m-%d').timestamp())
+        if start_date == end_date:
+            end_date = int((datetime.datetime.fromtimestamp(end_date) + datetime.timedelta(days=1)).timestamp())
+        if start_date > end_date:
+            raise ValueError('Error')
+    except ValueError:
+        raise HTTPException(status_code=400, detail='参数错误!')
+    # 查询数据分页
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "SELECT id,create_time,update_time,content,msg_type,effects,note,audit_mind,is_active "
+            "FROM work_short_message WHERE create_time>=%s AND create_time <= %s ORDER BY create_time DESC LIMIT %s,%s;",
+            (start_date, end_date, (body_item.page - 1) * body_item.page_size, body_item.page_size)
+        )
+        messages = cursor.fetchall()
+        # 查询总数量
+        cursor.execute("SELECT id,author_id FROM work_short_message "
+                       "WHERE create_time>=%s AND create_time <= %s;", (start_date, end_date))
+        total_message = cursor.fetchall()
+    messages = list(map(handler_message_content, messages))
+    # 处理包含的作者
+    resp_message = []
+    total_count = 0
+    if body_item.req_staff:
+        for m_item in messages:
+            if m_item['author_id'] in body_item.req_staff:
+                resp_message.append(m_item)
+        for t_item in total_message:
+            if t_item['author_id'] in body_item.req_staff:
+                total_count += 1
+    else:
+        resp_message = messages
+        total_count = len(total_message)
+    return {'message': '获取数据成功!', 'messages': resp_message, 'page': body_item.page, 'total_count': total_count}
+
+
+@message_api.delete('/{msg_id}/')  # 删除一条短信通
+async def delete_short_message(msg_id: int, user_token: str = Query(...)):
+    user_id, access = decipher_user_token(user_token)
+    is_admin = 1 if 'admin' in access else 0
+    # 删除数据
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "DELETE FROM work_short_message WHERE id=%s AND IF(1=%s,TRUE,author_id=%s);",
+            (msg_id, is_admin, user_id)
+        )
+    return {'message': '删除成功!'}
