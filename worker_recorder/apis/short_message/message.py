@@ -6,6 +6,8 @@
 # 1. 用户上传短讯通文件数据
 # 2. 用户删除自己的一条短讯通或管理员删除一条短讯通
 # 3. 用户获取自己的短讯通数据(分页)
+# 4. POST-管理者获取待批注数据(分页)
+# 5. PUT-管理者进行批注
 
 import datetime
 
@@ -17,7 +19,7 @@ from utils.encryption import decipher_user_token
 from utils.file_hands import date_column_converter
 from utils.constants import MSG_AUDIT_MIND
 from logger import logger
-from .validate_models import AuditMsgBodyItem
+from .validate_models import AuditMsgBodyItem, AuditMessageItem
 
 message_api = APIRouter()
 
@@ -26,7 +28,7 @@ message_api = APIRouter()
 def handler_message_content(m_item):
     m_item['create_time'] = datetime.datetime.fromtimestamp(m_item['create_time']).strftime('%Y-%m-%d')
     m_item['update_time'] = datetime.datetime.fromtimestamp(m_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
-    m_item['audit_description'] = '审核意见：{}'.format(MSG_AUDIT_MIND.get(m_item['audit_mind'], '无'))
+    m_item['audit_description'] = '批注意见：{}'.format(MSG_AUDIT_MIND.get(m_item['audit_mind'], '无'))
     return m_item
 
 
@@ -113,11 +115,11 @@ async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), 
     return {'message': '获取数据成功!', 'messages': messages, 'page': page, 'total_count': total_count}
 
 
-@message_api.post('/audit/')  # 管理员审核短讯通数据
+@message_api.post('/audit/')  # 管理员批注短讯通数据
 async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
     operate_id, access = decipher_user_token(body_item.user_token)
     if not operate_id:
-        raise HTTPException(status_code=401, detail='登录过期!')
+        raise HTTPException(status_code=401, detail='登录过期!请重新登录。')
     if 'admin' not in access and 'short_message' not in access:
         raise HTTPException(status_code=403, detail='不能这样操作!')
     # 处理时间区域
@@ -133,7 +135,7 @@ async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
     # 查询数据分页
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,create_time,update_time,content,msg_type,effects,note,audit_mind,is_active "
+            "SELECT id,create_time,update_time,author_id,content,msg_type,effects,note,audit_mind,is_active "
             "FROM work_short_message WHERE create_time>=%s AND create_time <= %s ORDER BY create_time DESC LIMIT %s,%s;",
             (start_date, end_date, (body_item.page - 1) * body_item.page_size, body_item.page_size)
         )
@@ -157,6 +159,24 @@ async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
         resp_message = messages
         total_count = len(total_message)
     return {'message': '获取数据成功!', 'messages': resp_message, 'page': body_item.page, 'total_count': total_count}
+
+
+@message_api.put('/audit/{msg_id}/')  # 修改一条短讯通的批注
+async def update_message_audit(msg_id: int, body_item: AuditMessageItem = Body(...)):
+    operate_id, access = decipher_user_token(body_item.user_token)
+    if not operate_id:
+        raise HTTPException(status_code=401, detail='登录过期!请重新登录。')
+    if 'admin' not in access and 'short_message' not in access:
+        raise HTTPException(status_code=403, detail='不能这样操作!')
+    print(body_item)
+    print(msg_id)
+    # 修改数据
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "UPDATE work_short_message SET audit_mind=%s WHERE id=%s;", (body_item.audit_mind, msg_id)
+        )
+    audit_description = '批注意见：{}'.format(MSG_AUDIT_MIND.get(body_item.audit_mind, '无'))
+    return {'message': '修改成功!', 'audit_description': audit_description, 'audit_mind': body_item.audit_mind}
 
 
 @message_api.delete('/{msg_id}/')  # 删除一条短信通
