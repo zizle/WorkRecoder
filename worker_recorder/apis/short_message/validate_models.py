@@ -14,6 +14,7 @@ class AuditMsgBodyItem(BaseModel):
     req_staff: list
     start_date: str
     end_date: str
+    keyword: str
 
 
 # 管理员批注短讯通的body参数

@@ -31,6 +31,9 @@ def handler_message_content(m_item):
     m_item['audit_description'] = '批注意见：{}'.format(MSG_AUDIT_MIND.get(m_item['audit_mind'], '无'))
     return m_item
 
+# 过滤短信通指定以外的作者
+
+
 
 @message_api.post('/excel/')
 async def excel_short_message(excel_file: UploadFile = Form(...), user_token: str = Form(...)):
@@ -98,7 +101,7 @@ async def excel_short_message(excel_file: UploadFile = Form(...), user_token: st
 async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), page_size: int = Query(1, ge=1)):
     user_id, _ = decipher_user_token(user_token)
     if not user_id:
-        raise HTTPException(status_code=401, detail='登录过期了!')
+        raise HTTPException(status_code=401, detail='登录过期了!请重新登录.')
     # 分页查询数据
     with DBWorker() as (_, cursor):
         cursor.execute(
@@ -115,7 +118,7 @@ async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), 
     return {'message': '获取数据成功!', 'messages': messages, 'page': page, 'total_count': total_count}
 
 
-@message_api.post('/audit/')  # 管理员批注短讯通数据
+@message_api.post('/audit/')  # 管理员查询要批注短讯通数据
 async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
     operate_id, access = decipher_user_token(body_item.user_token)
     if not operate_id:
@@ -135,30 +138,37 @@ async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
     # 查询数据分页
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,create_time,update_time,author_id,content,msg_type,effects,note,audit_mind,is_active "
-            "FROM work_short_message WHERE create_time>=%s AND create_time <= %s ORDER BY create_time DESC LIMIT %s,%s;",
-            (start_date, end_date, (body_item.page - 1) * body_item.page_size, body_item.page_size)
+            "SELECT msgtb.id,msgtb.create_time,msgtb.update_time,msgtb.author_id,msgtb.content,"
+            "msgtb.msg_type,msgtb.effects,msgtb.note,msgtb.audit_mind,msgtb.is_active,"
+            "usertb.username "
+            "FROM work_short_message AS msgtb "
+            "INNER JOIN user_user AS usertb ON usertb.id=msgtb.author_id "
+            "WHERE msgtb.create_time>=%s AND msgtb.create_time <= %s "
+            "ORDER BY msgtb.create_time DESC;",
+            (start_date, end_date)
         )
         messages = cursor.fetchall()
         # 查询总数量
-        cursor.execute("SELECT id,author_id FROM work_short_message "
-                       "WHERE create_time>=%s AND create_time <= %s;", (start_date, end_date))
-        total_message = cursor.fetchall()
-    messages = list(map(handler_message_content, messages))
-    # 处理包含的作者
-    resp_message = []
-    total_count = 0
+        cursor.execute("SELECT msgtb.id,msgtb.author_id,msgtb.content "
+                       "FROM work_short_message AS msgtb "
+                       "INNER JOIN user_user AS usertb ON usertb.id=msgtb.author_id "
+                       "WHERE msgtb.create_time>=%s AND msgtb.create_time <= %s;",
+                       (start_date, end_date))
+        total_messages = cursor.fetchall()
+    # 过滤数据(处理作者)
     if body_item.req_staff:
-        for m_item in messages:
-            if m_item['author_id'] in body_item.req_staff:
-                resp_message.append(m_item)
-        for t_item in total_message:
-            if t_item['author_id'] in body_item.req_staff:
-                total_count += 1
-    else:
-        resp_message = messages
-        total_count = len(total_message)
-    return {'message': '获取数据成功!', 'messages': resp_message, 'page': body_item.page, 'total_count': total_count}
+        messages = list(filter(lambda x: x['author_id'] in body_item.req_staff, messages))
+        total_messages = list(filter(lambda x: x['author_id'] in body_item.req_staff, total_messages))
+    # 过滤数据(处理关键字)
+    if body_item.keyword:
+        messages = list(filter(lambda x: body_item.keyword in x['content'], messages))
+        total_messages = list(filter(lambda x: body_item.keyword in x['content'], total_messages))
+    # 截取数据
+    messages = messages[(body_item.page - 1) * body_item.page_size: body_item.page_size * body_item.page]
+    # 处理数据内容
+    messages = list(map(handler_message_content, messages))
+
+    return {'message': '获取数据成功!', 'messages': messages, 'page': body_item.page, 'total_count': len(total_messages)}
 
 
 @message_api.put('/audit/{msg_id}/')  # 修改一条短讯通的批注
@@ -168,8 +178,6 @@ async def update_message_audit(msg_id: int, body_item: AuditMessageItem = Body(.
         raise HTTPException(status_code=401, detail='登录过期!请重新登录。')
     if 'admin' not in access and 'short_message' not in access:
         raise HTTPException(status_code=403, detail='不能这样操作!')
-    print(body_item)
-    print(msg_id)
     # 修改数据
     with DBWorker() as (_, cursor):
         cursor.execute(
@@ -182,11 +190,29 @@ async def update_message_audit(msg_id: int, body_item: AuditMessageItem = Body(.
 @message_api.delete('/{msg_id}/')  # 删除一条短信通
 async def delete_short_message(msg_id: int, user_token: str = Query(...)):
     user_id, access = decipher_user_token(user_token)
-    is_admin = 1 if 'admin' in access else 0
+    is_admin = 0
+    if 'admin' in access or 'short_message' in access:
+        is_admin = 1
     # 删除数据
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "DELETE FROM work_short_message WHERE id=%s AND IF(1=%s,TRUE,author_id=%s);",
-            (msg_id, is_admin, user_id)
+            "SELECT id,author_id,audit_mind FROM work_short_message WHERE id=%s;", (msg_id, )
         )
-    return {'message': '删除成功!'}
+        msg_record = cursor.fetchone()
+        can_delete = True
+        err_message = '已成功删除!'
+        if msg_record:
+            if msg_record['author_id'] != user_id and is_admin == 0:
+                can_delete = False
+                err_message = '您不能删除他人的记录!'
+            if msg_record['audit_mind'] != 0 and is_admin == 0:
+                can_delete = False
+                err_message = '已批注过的信息请联系管理员删除!'
+        if can_delete:
+            cursor.execute(
+                "DELETE FROM work_short_message WHERE id=%s AND IF(1=%s,TRUE,author_id=%s);",
+                (msg_id, is_admin, user_id)
+            )
+            return {'message': '删除成功!'}
+        else:
+            raise HTTPException(status_code=403, detail=err_message)
