@@ -5,9 +5,8 @@
 
 # 1. 用户上传短讯通文件数据
 # 2. 用户删除自己的一条短讯通或管理员删除一条短讯通
-# 3. 用户获取自己的短讯通数据(分页)
-# 4. POST-管理者获取待批注数据(分页)
-# 5. PUT-管理者进行批注
+# 3. POST-用户或批注管理者获取短讯通数据(分页)
+# 4. PUT-管理者进行批注
 
 import datetime
 
@@ -19,7 +18,7 @@ from utils.encryption import decipher_user_token
 from utils.file_hands import date_column_converter
 from utils.constants import MSG_AUDIT_MIND
 from logger import logger
-from .validate_models import AuditMsgBodyItem, AuditMessageItem
+from .validate_models import AuditMessageItem, QueryMsgBodyItem
 
 message_api = APIRouter()
 
@@ -30,9 +29,6 @@ def handler_message_content(m_item):
     m_item['update_time'] = datetime.datetime.fromtimestamp(m_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
     m_item['audit_description'] = '批注意见：{}'.format(MSG_AUDIT_MIND.get(m_item['audit_mind'], '无'))
     return m_item
-
-# 过滤短信通指定以外的作者
-
 
 
 @message_api.post('/excel/')
@@ -68,7 +64,7 @@ async def excel_short_message(excel_file: UploadFile = Form(...), user_token: st
     with DBWorker() as (_, cursor):
         cursor.execute(
             "SELECT MAX(create_time) AS max_date FROM work_short_message WHERE author_id=%s;",
-            (user_id, )
+            (user_id,)
         )
         current_max_date = cursor.fetchone()['max_date']
         if current_max_date is None:
@@ -97,34 +93,18 @@ async def excel_short_message(excel_file: UploadFile = Form(...), user_token: st
     return {'message': '上传数据成功!新增{}条。'.format(len(message_saved)), 'messages': message_saved}
 
 
-@message_api.get('/')  # 用户分页获取自己的短讯通数据
-async def get_message(user_token: str = Query(...), page: int = Query(1, ge=1), page_size: int = Query(1, ge=1)):
-    user_id, _ = decipher_user_token(user_token)
+@message_api.post('/', )  # POST-分页获取短讯通数据(包含待批注数据获取)
+async def query_short_message(body_item: QueryMsgBodyItem):
+    print(body_item)
+    user_id, access = decipher_user_token(body_item.user_token)
     if not user_id:
-        raise HTTPException(status_code=401, detail='登录过期了!请重新登录.')
-    # 分页查询数据
-    with DBWorker() as (_, cursor):
-        cursor.execute(
-            "SELECT id,create_time,update_time,content,msg_type,effects,note,audit_mind,is_active "
-            "FROM work_short_message WHERE author_id=%s ORDER BY create_time DESC LIMIT %s,%s;",
-            (user_id, (page - 1) * page_size, page_size)
-        )
-        messages = cursor.fetchall()
-        # 查询总数量
-        cursor.execute("SELECT count(id) as total_count FROM work_short_message WHERE author_id=%s;", (user_id, ))
-        total_obj = cursor.fetchone()
-        total_count = total_obj['total_count'] if total_obj['total_count'] else 0
-    messages = list(map(handler_message_content, messages))
-    return {'message': '获取数据成功!', 'messages': messages, 'page': page, 'total_count': total_count}
-
-
-@message_api.post('/audit/')  # 管理员查询要批注短讯通数据
-async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
-    operate_id, access = decipher_user_token(body_item.user_token)
-    if not operate_id:
         raise HTTPException(status_code=401, detail='登录过期!请重新登录。')
-    if 'admin' not in access and 'short_message' not in access:
-        raise HTTPException(status_code=403, detail='不能这样操作!')
+    # 判断是否为批注页获取
+    is_audit = 0
+    if body_item.is_audit:
+        if 'admin' not in access and 'short_message' not in access:
+            raise HTTPException(status_code=403, detail='不能这样操作!')
+        is_audit = 1
     # 处理时间区域
     try:
         start_date = int(datetime.datetime.strptime(body_item.start_date, '%Y-%m-%d').timestamp())
@@ -135,7 +115,7 @@ async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
             raise ValueError('Error')
     except ValueError:
         raise HTTPException(status_code=400, detail='参数错误!')
-    # 查询数据分页
+    # 查询数据
     with DBWorker() as (_, cursor):
         cursor.execute(
             "SELECT msgtb.id,msgtb.create_time,msgtb.update_time,msgtb.author_id,msgtb.content,"
@@ -143,23 +123,24 @@ async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
             "usertb.username "
             "FROM work_short_message AS msgtb "
             "INNER JOIN user_user AS usertb ON usertb.id=msgtb.author_id "
-            "WHERE msgtb.create_time>=%s AND msgtb.create_time <= %s "
+            "WHERE msgtb.create_time>=%s AND msgtb.create_time <= %s AND IF(1=%s,TRUE,msgtb.author_id=%s) "
             "ORDER BY msgtb.create_time DESC;",
-            (start_date, end_date)
+            (start_date, end_date, is_audit, user_id)
         )
         messages = cursor.fetchall()
         # 查询总数量
-        cursor.execute("SELECT msgtb.id,msgtb.author_id,msgtb.content "
-                       "FROM work_short_message AS msgtb "
-                       "INNER JOIN user_user AS usertb ON usertb.id=msgtb.author_id "
-                       "WHERE msgtb.create_time>=%s AND msgtb.create_time <= %s;",
-                       (start_date, end_date))
+        cursor.execute(
+            "SELECT msgtb.id,msgtb.author_id,msgtb.content "
+            "FROM work_short_message AS msgtb "
+            "INNER JOIN user_user AS usertb ON usertb.id=msgtb.author_id "
+            "WHERE msgtb.create_time>=%s AND msgtb.create_time <= %s AND IF(1=%s,TRUE,msgtb.author_id=%s);",
+            (start_date, end_date, is_audit, user_id)
+        )
         total_messages = cursor.fetchall()
-    # 过滤数据(处理作者)
-    if body_item.req_staff:
+    if is_audit and body_item.req_staff:
         messages = list(filter(lambda x: x['author_id'] in body_item.req_staff, messages))
         total_messages = list(filter(lambda x: x['author_id'] in body_item.req_staff, total_messages))
-    # 过滤数据(处理关键字)
+    # 过滤关键词
     if body_item.keyword:
         messages = list(filter(lambda x: body_item.keyword in x['content'], messages))
         total_messages = list(filter(lambda x: body_item.keyword in x['content'], total_messages))
@@ -167,7 +148,6 @@ async def audit_message(body_item: AuditMsgBodyItem = Body(...)):
     messages = messages[(body_item.page - 1) * body_item.page_size: body_item.page_size * body_item.page]
     # 处理数据内容
     messages = list(map(handler_message_content, messages))
-
     return {'message': '获取数据成功!', 'messages': messages, 'page': body_item.page, 'total_count': len(total_messages)}
 
 
@@ -187,6 +167,11 @@ async def update_message_audit(msg_id: int, body_item: AuditMessageItem = Body(.
     return {'message': '修改成功!', 'audit_description': audit_description, 'audit_mind': body_item.audit_mind}
 
 
+@message_api.get('/statistics/')  # 获取短讯通考核排名数据
+async def message_statistics():
+    pass
+
+
 @message_api.delete('/{msg_id}/')  # 删除一条短信通
 async def delete_short_message(msg_id: int, user_token: str = Query(...)):
     user_id, access = decipher_user_token(user_token)
@@ -196,7 +181,7 @@ async def delete_short_message(msg_id: int, user_token: str = Query(...)):
     # 删除数据
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,author_id,audit_mind FROM work_short_message WHERE id=%s;", (msg_id, )
+            "SELECT id,author_id,audit_mind FROM work_short_message WHERE id=%s;", (msg_id,)
         )
         msg_record = cursor.fetchone()
         can_delete = True

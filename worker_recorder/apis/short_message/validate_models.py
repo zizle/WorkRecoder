@@ -6,15 +6,16 @@
 from pydantic import BaseModel
 
 
-# 管理员post请求短讯通数据的body参数
-class AuditMsgBodyItem(BaseModel):
-    page: int
-    page_size: int
+# 查询短讯通post请求的body参数
+class QueryMsgBodyItem(BaseModel):
     user_token: str
-    req_staff: list
     start_date: str
     end_date: str
+    page: int
+    page_size: int
     keyword: str
+    req_staff: list = []
+    is_audit: int = 0
 
 
 # 管理员批注短讯通的body参数
