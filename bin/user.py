@@ -5,6 +5,8 @@
 
 from worker_recorder.db import DBWorker
 
+# access = ['admin', 'short_message', 'strategy', 'investment', 'abnormal_work', 'revenue', 'article']
+
 
 def create_user_table():
     with DBWorker() as (_, cursor):
@@ -18,11 +20,12 @@ def create_user_table():
             "`password` VARCHAR(32) NOT NULL COMMENT 'hash密码',"
             "`phone` CHAR(11) NOT NULL UNIQUE COMMENT '手机号',"
             "`email` VARCHAR(64) DEFAULT '' COMMENT '邮箱',"
-            "`organization` INT NOT NULL DEFAULT 0,"
-            "`is_admin` BIT NOT NULL DEFAULT 0,"
+            "`organization` INT NOT NULL DEFAULT 0 COMMENT '部门小组',"
+            "`access` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '额外权限',"
             "`is_active` BIT NOT NULL DEFAULT 1"
             ") DEFAULT CHARSET='utf8';"
         )
+
 
 def migrate_users():
     with DBWorker() as (_, cursor):
@@ -35,12 +38,13 @@ def migrate_users():
             item['update_time'] = int(item['update_time'].timestamp())
             item['organization'] = item['org_id']
             item['username'] = item['name']
+            item['access'] = 'admin' if item['is_admin'] else ''
         # 保存
         cursor.executemany(
             "INSERT INTO user_user (id,join_time,update_time,username,fixed_code,password,phone,email,"
-            "organization,is_admin,is_active)"
+            "organization,access,is_active)"
             "VALUES (%(id)s,%(join_time)s,%(update_time)s,%(username)s,%(fixed_code)s,%(password)s,%(phone)s,%(email)s,"
-            "%(organization)s,%(is_admin)s,%(is_active)s);",
+            "%(organization)s,%(access)s,%(is_active)s);",
             users
         )
 
