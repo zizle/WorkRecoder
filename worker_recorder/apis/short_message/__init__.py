@@ -8,8 +8,10 @@
 from fastapi import APIRouter
 
 from .message import message_api
+from .statistics import statistics_api
 
 short_message_router = APIRouter()
 
 short_message_router.include_router(message_api)
+short_message_router.include_router(statistics_api, prefix='/statistics')
 
