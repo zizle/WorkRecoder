@@ -14,24 +14,37 @@ from db import DBWorker
 statistics_api = APIRouter()
 
 
-def get_next_month_date(c_date: datetime.datetime):
-    year = c_date.year
-    month = c_date.month
+def get_month_range(query_date: str):
+    try:
+        query_date = datetime.datetime.strptime(query_date, '%Y-%m-01')
+    except ValueError:
+        raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-%m-01`.')
+    year = query_date.year
+    month = query_date.month
     if month == 12:
         month = 1
         year += 1
     else:
         month += 1
-    return datetime.datetime.strptime('{}-{}-01'.format(year, month), '%Y-%m-01')
-
-
-def get_messages(query_date: str):
-    try:
-        query_date = datetime.datetime.strptime(query_date, '%Y-%m-01')
-    except ValueError:
-        raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-%m-01`.')
+    end_date = datetime.datetime.strptime('{}-{}-01'.format(year, month), '%Y-%m-01')
     start_timestamp = int(query_date.timestamp())
-    end_timestamp = int(get_next_month_date(query_date).timestamp())
+    end_timestamp = int(end_date.timestamp())
+    return start_timestamp, end_timestamp
+
+
+def get_year_range(query_date: str):
+    try:
+        query_date = datetime.datetime.strptime(query_date, '%Y-01-01')
+    except ValueError:
+        raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-01-01`.')
+    year = query_date.year
+    end_date = datetime.datetime.strptime('{}-01-01'.format(year + 1), '%Y-01-01')
+    start_timestamp = int(query_date.timestamp())
+    end_timestamp = int(end_date.timestamp())
+    return start_timestamp, end_timestamp
+
+
+def get_messages(start_timestamp: int, end_timestamp: int):
     # 查询数据
     with DBWorker() as (_, cursor):
         cursor.execute(
@@ -45,14 +58,9 @@ def get_messages(query_date: str):
     return messages
 
 
-@statistics_api.get('/month-rank/')
-async def get_month_rank(query_date: str = Query(...)):
-    messages = get_messages(query_date)
-    # print(message)
-    # 使用pandas进行目标数据处理
-    message_df = pd.DataFrame(messages)
+def handle_amount_audit_rank(message_df):
     if message_df.empty:
-        return {'message': '统计成功!', 'amount_rank': [], 'quality_rank': []}
+        return [], []
     # 以作者分组统计
     author_count_df = message_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg({'count': 'count'})
     author_count_df['rank'] = author_count_df['count'].rank(method='dense', ascending=False).astype(int)
@@ -61,16 +69,25 @@ async def get_month_rank(query_date: str = Query(...)):
     # 筛选出audit_mind != 0的
     message_audit_df = message_df[~(message_df['audit_mind'] == 0)]
     # 对此进行分组统计
-    audit_mind_count_df = message_audit_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg({'count': 'count'})
+    audit_mind_count_df = message_audit_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+        {'count': 'count'})
     audit_mind_count_df['rank'] = audit_mind_count_df['count'].rank(method='dense', ascending=False).astype(int)
     quality_rank = audit_mind_count_df.to_dict(orient='records')
+    return amount_rank, quality_rank
 
+
+@statistics_api.get('/month-rank/')
+async def get_month_rank(query_date: str = Query(...)):
+    start_timestamp, end_timestamp = get_month_range(query_date)
+    messages = get_messages(start_timestamp, end_timestamp)
+    amount_rank, quality_rank = handle_amount_audit_rank(pd.DataFrame(messages))
     return {'message': '统计成功!', 'amount_rank': amount_rank, 'quality_rank': quality_rank}
 
 
 @statistics_api.get('/month-detail/')
 async def get_month_detail(query_date: str = Query(...)):
-    messages = get_messages(query_date)
+    start_timestamp, end_timestamp = get_month_range(query_date)
+    messages = get_messages(start_timestamp, end_timestamp)
     # 转为DataFrame进行处理
     message_df = pd.DataFrame(messages)
     if message_df.empty:
@@ -92,3 +109,21 @@ async def get_month_detail(query_date: str = Query(...)):
         result.append(user_data)
 
     return {'message': '统计成功!', 'month_detail': result}
+
+
+@statistics_api.get('/year-rank/')
+async def get_year_rank(query_date: str = Query(...)):
+    start_timestamp, end_timestamp = get_year_range(query_date)
+    message = get_messages(start_timestamp, end_timestamp)
+    # 转为DataFrame处理
+    message_df = pd.DataFrame(message)
+    if message_df.empty:
+        return {'message': '统计成功!', 'amount_rank': [], 'quality_rank': []}
+    amount_rank, quality_rank = handle_amount_audit_rank(message_df)
+    return {'message': '统计成功!', 'amount_rank': amount_rank, 'quality_rank': quality_rank}
+
+
+@statistics_api.get('/year-detail/')
+async def get_month_detail(query_date: str = Query(...)):
+
+    return {'message': '查询成功!'}
