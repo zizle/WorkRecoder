@@ -141,7 +141,7 @@ async def set_user_access(user_id: int = Body(..., embed=True),
 
 @user_api.get('/message/count/')  # 用户的未读消息数
 async def unread_message_count():
-    return {'count': 5}
+    return {'count': 0}
 
 
 @user_api.get('/message/init/')   # 初始化信息页面
