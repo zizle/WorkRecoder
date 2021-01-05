@@ -95,7 +95,6 @@ async def excel_short_message(excel_file: UploadFile = Form(...), user_token: st
 
 @message_api.post('/', )  # POST-分页获取短讯通数据(包含待批注数据获取)
 async def query_short_message(body_item: QueryMsgBodyItem):
-    print(body_item)
     user_id, access = decipher_user_token(body_item.user_token)
     if not user_id:
         raise HTTPException(status_code=401, detail='登录过期!请重新登录。')
@@ -165,11 +164,6 @@ async def update_message_audit(msg_id: int, body_item: AuditMessageItem = Body(.
         )
     audit_description = '批注意见：{}'.format(MSG_AUDIT_MIND.get(body_item.audit_mind, '无'))
     return {'message': '修改成功!', 'audit_description': audit_description, 'audit_mind': body_item.audit_mind}
-
-
-@message_api.get('/statistics/')  # 获取短讯通考核排名数据
-async def message_statistics():
-    pass
 
 
 @message_api.delete('/{msg_id}/')  # 删除一条短信通

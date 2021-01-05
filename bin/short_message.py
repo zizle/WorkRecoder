@@ -46,5 +46,5 @@ def migrate_message():
 
 
 if __name__ == '__main__':
-    # create_short_message_table()
+    create_short_message_table()
     migrate_message()

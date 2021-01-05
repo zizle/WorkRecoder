@@ -6,10 +6,12 @@ from fastapi import APIRouter
 from apis.user import user_router        # 用户API
 from apis.variety import variety_router  # 品种的api
 from apis.short_message import short_message_router  # 短信通api
+from apis.statistics import statistics_router
 
 
 routers = APIRouter()
 
+routers.include_router(statistics_router, prefix='/statistics')
 routers.include_router(user_router, prefix='/user')
 routers.include_router(variety_router, prefix='/variety')
 routers.include_router(short_message_router, prefix='/shtmsg')

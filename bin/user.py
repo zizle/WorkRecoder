@@ -50,5 +50,5 @@ def migrate_users():
 
 
 if __name__ == '__main__':
-    # create_user_table()
+    create_user_table()
     migrate_users()
