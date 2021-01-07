@@ -4,10 +4,10 @@
 # @Author: zizle
 
 import datetime
-from fastapi import HTTPException
 from pydantic import BaseModel, ValidationError, validator
 
 
+# 手动添加一条策略验证
 class StrategyAddItem(BaseModel):
     user_token: str
     create_time: str
@@ -36,3 +36,25 @@ class StrategyAddItem(BaseModel):
         return value
 
 
+# 查询年度策略的post-body参数
+class QueryStrategyItem(BaseModel):
+    user_token: str
+    start_date: str
+    end_date: str
+    page: int = 1
+    page_size: int = 50
+    keyword: str
+    req_staff: list = []
+    is_audit: int = 0
+
+    @validator('page_size')
+    def validate_page_size(cls, value):
+        if value > 2000:
+            raise ValidationError('page_size too large!')
+        return value
+
+    @validator('page')
+    def validate_page(cls, value):
+        if value < 1:
+            raise ValidationError('page must be >= 1 !')
+        return value

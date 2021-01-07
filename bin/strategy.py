@@ -12,7 +12,7 @@ def create_strategy_table():
             "CREATE TABLE IF NOT EXISTS `work_strategy` ("
             "`id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT COMMENT 'ID',"
             "`create_time` INT NOT NULL COMMENT '策略日期',"
-            "`join_time` INT NOT NULL COMMENT '添加时间',"
+            "`join_time` INT NOT NULL COMMENT '上传时间',"
             "`update_time` INT NOT NULL COMMENT '更新时间',"
             "`author_id` INT NOT NULL COMMENT '用户ID',"
             "`content` VARCHAR(2048) NOT NULL COMMENT '策略内容',"
@@ -24,7 +24,8 @@ def create_strategy_table():
             "`close_price` DECIMAL(15,6) NOT NULL DEFAULT 0 COMMENT '策略平仓',"
             "`profit` DECIMAL(15,6) NOT NULL DEFAULT 0 COMMENT '策略平仓',"
             "`note` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '备注',"
-            "`is_active` BIT NOT NULL DEFAULT 1"
+            "`is_active` BIT NOT NULL DEFAULT 1,"
+            "`is_edit` BIT NOT NULL DEFAULT 1"
             ") DEFAULT CHARSET='utf8';"
         )
 

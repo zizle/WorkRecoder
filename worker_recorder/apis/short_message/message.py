@@ -18,8 +18,10 @@ from db import DBWorker
 from utils.encryption import decipher_user_token
 from utils.file_hands import date_column_converter
 from utils.constants import MSG_AUDIT_MIND
+from apis.tools import validate_operate_user, validate_date_range, filter_records
 from logger import logger
 from .validate_models import AuditMessageItem, QueryMsgBodyItem, JoinTimeDelMsgItem
+
 
 message_api = APIRouter()
 
@@ -27,6 +29,7 @@ message_api = APIRouter()
 # 处理短讯通返回数据的内容
 def handler_message_content(m_item):
     m_item['create_time'] = datetime.datetime.fromtimestamp(m_item['create_time']).strftime('%Y-%m-%d')
+    m_item['join_time'] = datetime.datetime.fromtimestamp(m_item['join_time']).strftime('%Y-%m-%d %H:%M:%S')
     m_item['update_time'] = datetime.datetime.fromtimestamp(m_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
     m_item['audit_description'] = '批注意见：{}'.format(MSG_AUDIT_MIND.get(m_item['audit_mind'], '无'))
     return m_item
@@ -114,29 +117,14 @@ async def delete_with_join_time(del_item: JoinTimeDelMsgItem = Body(...)):
 
 @message_api.post('/', )  # POST-分页获取短讯通数据(包含待批注数据获取)
 async def query_short_message(body_item: QueryMsgBodyItem):
-    user_id, access = decipher_user_token(body_item.user_token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail='登录过期!请重新登录。')
-    # 判断是否为批注页获取
-    is_audit = 0
-    if body_item.is_audit:
-        if 'admin' not in access and 'short_message' not in access:
-            raise HTTPException(status_code=403, detail='不能这样操作!')
-        is_audit = 1
-    # 处理时间区域
-    try:
-        start_date = int(datetime.datetime.strptime(body_item.start_date, '%Y-%m-%d').timestamp())
-        end_date = int(datetime.datetime.strptime(body_item.end_date, '%Y-%m-%d').timestamp())
-        if start_date == end_date:
-            end_date = int((datetime.datetime.fromtimestamp(end_date) + datetime.timedelta(days=1)).timestamp())
-        if start_date > end_date:
-            raise ValueError('Error')
-    except ValueError:
-        raise HTTPException(status_code=400, detail='参数错误!')
+    audit = 'short_message' if body_item.is_audit else None
+    user_id, is_audit = validate_operate_user(body_item.user_token, audit)
+    # # 处理时间区域
+    start_date, end_date = validate_date_range(body_item.start_date, body_item.end_date)
     # 查询数据
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT msgtb.id,msgtb.create_time,msgtb.update_time,msgtb.author_id,msgtb.content,"
+            "SELECT msgtb.id,msgtb.create_time,msgtb.join_time,msgtb.update_time,msgtb.author_id,msgtb.content,"
             "msgtb.msg_type,msgtb.effects,msgtb.note,msgtb.audit_mind,msgtb.is_active,"
             "usertb.username "
             "FROM work_short_message AS msgtb "
@@ -155,14 +143,9 @@ async def query_short_message(body_item: QueryMsgBodyItem):
             (start_date, end_date, is_audit, user_id)
         )
         total_messages = cursor.fetchall()
-    if is_audit and body_item.req_staff:
-        messages = list(filter(lambda x: x['author_id'] in body_item.req_staff, messages))
-        total_messages = list(filter(lambda x: x['author_id'] in body_item.req_staff, total_messages))
-    # 过滤关键词
-    if body_item.keyword:
-        messages = list(filter(lambda x: body_item.keyword in x['content'], messages))
-        total_messages = list(filter(lambda x: body_item.keyword in x['content'], total_messages))
-    # 截取数据
+    messages, total_messages = filter_records(
+        is_audit, body_item.req_staff, body_item.keyword, messages, total_messages)
+    # 截取数据(分页)
     messages = messages[(body_item.page - 1) * body_item.page_size: body_item.page_size * body_item.page]
     # 处理数据内容
     messages = list(map(handler_message_content, messages))
@@ -208,7 +191,7 @@ async def delete_short_message(msg_id: int, user_token: str = Query(...)):
                 err_message = '已批注过的信息请联系管理员删除!'
         if can_delete:
             cursor.execute(
-                "DELETE FROM work_short_message WHERE id=%s AND IF(1=%s,TRUE,author_id=%s);",
+                "DELETE FROM work_short_message WHERE id=%s AND IF(1=%s,TRUE,author_id=%s) LIMIT 1;",
                 (msg_id, is_admin, user_id)
             )
             return {'message': '删除成功!'}

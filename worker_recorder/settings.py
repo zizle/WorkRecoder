@@ -12,7 +12,7 @@ print(STATICS_STORAGE)
 
 APP_HOST = "http://127.0.0.1:8000/"
 
-TOKEN_EXPIRES = 3600  # seconds
+TOKEN_EXPIRES = 36000  # seconds
 
 DATABASE = {
     'worker_db': {

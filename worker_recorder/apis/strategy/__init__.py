@@ -7,8 +7,10 @@
 from fastapi import APIRouter
 
 from .strategy import strategy_api
+from .statistics import statistics_api
 
 strategy_router = APIRouter()
 
 
 strategy_router.include_router(strategy_api)
+strategy_router.include_router(statistics_api, prefix='/statistics')
