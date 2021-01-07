@@ -19,6 +19,7 @@ class StrategyAddItem(BaseModel):
     open_price: float
     close_price: float
     profit: float
+    is_running: int
     note: str
 
     @validator('user_token')
@@ -33,6 +34,12 @@ class StrategyAddItem(BaseModel):
             datetime.datetime.strptime(value, '%Y-%m-%d')
         except ValueError:
             raise ValidationError('create_time can not format `%Y-%m-%d`.')
+        return value
+
+    @validator('is_running')
+    def validate_is_running(cls, value):
+        if value not in [0, 1]:
+            raise ValidationError('is_running must be `0` or `1`!')
         return value
 
 

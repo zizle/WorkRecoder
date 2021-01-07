@@ -25,6 +25,7 @@ def create_strategy_table():
             "`profit` DECIMAL(15,6) NOT NULL DEFAULT 0 COMMENT '策略平仓',"
             "`note` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '备注',"
             "`is_active` BIT NOT NULL DEFAULT 1,"
+            "`is_running` BIT NOT NULL DEFAULT 0,"
             "`is_edit` BIT NOT NULL DEFAULT 1"
             ") DEFAULT CHARSET='utf8';"
         )

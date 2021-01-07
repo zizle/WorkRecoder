@@ -26,7 +26,7 @@ async def get_month_statistics(query_date: str = Query(...)):
     strategies = get_strategy(start_timestamp, end_timestamp, 0)
     # 转为DataFrame进行数据处理
     result = handle_strategy_amount_rate(pd.DataFrame(strategies))
-    return {'message': '统计成功!', 'data': result}
+    return {'message': '统计成功!', 'statistics': result}
 
 
 @statistics_api.get('/year/')  # 按年统计每人的投顾策略数量、成功量、成功率、收益、收益率
@@ -37,4 +37,4 @@ async def get_year_statistics(query_date: str = Query(...)):
     strategies = get_strategy(start_timestamp, end_timestamp, 0)
     # 转为DataFrame进行数据处理
     result = handle_strategy_amount_rate(pd.DataFrame(strategies))
-    return {'message': '统计成功!', 'data': result}
+    return {'message': '统计成功!', 'statistics': result}

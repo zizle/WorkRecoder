@@ -14,6 +14,7 @@ import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from utils.encryption import decipher_user_token
+from utils.constants import VARIETY_CN
 from db import DBWorker
 from .validate_models import StrategyAddItem, QueryStrategyItem
 from apis.tools import validate_operate_user, validate_date_range, filter_records
@@ -26,6 +27,7 @@ def handle_strategy_item(item):
     item['create_time'] = datetime.datetime.fromtimestamp(item['create_time']).strftime('%Y-%m-%d')
     item['join_time'] = datetime.datetime.fromtimestamp(item['join_time']).strftime('%Y-%m-%d %H:%M:%S')
     item['update_time'] = datetime.datetime.fromtimestamp(item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
+    item['contract_name'] = VARIETY_CN.get(item['variety_en'], '') + item['contract']
     return item
 
 
@@ -45,9 +47,10 @@ async def add_strategy(strategy_item: StrategyAddItem = Body(...)):
     with DBWorker() as (_, cursor):
         cursor.execute(
             "INSERT INTO work_strategy (create_time,join_time,update_time,author_id,content,variety_en,contract,"
-            "direction,hands,open_price,close_price,profit,note) VALUES (%(create_time)s,%(join_time)s,%(update_time)s,"
-            "%(author_id)s,%(content)s,%(variety_en)s,%(contract)s,%(direction)s,%(hands)s,%(open_price)s,"
-            "%(close_price)s,%(profit)s,%(note)s);",
+            "direction,hands,open_price,close_price,profit,is_running,note) "
+            "VALUES (%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(content)s,%(variety_en)s,"
+            "%(contract)s,%(direction)s,%(hands)s,%(open_price)s,"
+            "%(close_price)s,%(profit)s,%(is_running)s,%(note)s);",
             strategy_add
         )
     return {'message': '添加成功!'}
@@ -62,8 +65,9 @@ async def query_strategy(query_item: QueryStrategyItem = Body(...)):
     # 查询数据
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT stb.id,stb.create_time,stb.join_time,stb.update_time,stb.author_id,usertb.username,"
-            "stb.content,stb.direction,stb.hands,stb.open_price,stb.close_price,stb.profit,stb.note "
+            "SELECT stb.id,stb.create_time,stb.join_time,stb.update_time,stb.author_id,usertb.username,stb.variety_en,"
+            "stb.contract, stb.content,stb.direction,stb.hands,stb.open_price,stb.close_price,stb.profit,"
+            "stb.is_running,stb.note "
             "FROM work_strategy AS stb "
             "INNER JOIN user_user AS usertb ON usertb.id=stb.author_id "
             "WHERE stb.create_time>%s AND stb.create_time<=%s AND IF(1=%s,TRUE,stb.author_id=%s) "

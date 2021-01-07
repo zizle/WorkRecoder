@@ -24,6 +24,8 @@ def get_strategy(start_timestamp: int, end_timestamp: int, author_id: int):
 def handle_strategy_amount_rate(strategy_df):
     if strategy_df.empty:
         return []
+    # 去除运行中的策略
+    strategy_df = strategy_df[strategy_df['is_running'] == 0]
 
     # 分组计算的每人的收益总和
     sum_profit_df = strategy_df.groupby(by=['author_id', 'username'])['profit'].sum()
@@ -36,7 +38,7 @@ def handle_strategy_amount_rate(strategy_df):
         {'total_count': 'count'})
 
     # 将数量数据框与累计收益数据框合并
-    result_df = pd.merge(sum_profit_df, amount_count_df, on=['author_id', 'username'], how='inner')
+    result_df = pd.merge(sum_profit_df, amount_count_df, on=['author_id', 'username'], how='left')
 
     # 筛选收益率>0的条目
     success_df = strategy_df[strategy_df['profit'] > 0]
@@ -45,11 +47,12 @@ def handle_strategy_amount_rate(strategy_df):
         {'success_count': 'count'})
 
     # 将成功数量与结果数据框合并
-    result_df = pd.merge(result_df, success_count_df, on=['author_id', 'username'], how='inner')
+    result_df = pd.merge(result_df, success_count_df, on=['author_id', 'username'], how='left')
 
     # 计算成功率
     result_df['success_rate'] = result_df['success_count'] / result_df['total_count']
     # 计算累计总收益率
     result_df['sum_profit_rate'] = result_df['sum_profit'] / (100000 * result_df['total_count'])
 
+    result_df.fillna(0, inplace=True)
     return result_df.to_dict(orient='records')
