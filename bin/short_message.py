@@ -12,7 +12,8 @@ def create_short_message_table():
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS `work_short_message` ("
             "`id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT COMMENT 'ID',"
-            "`create_time` INT NOT NULL COMMENT '创建日期',"
+            "`create_time` INT NOT NULL COMMENT '创建时间',"
+            "`join_time` INT NOT NULL COMMENT '上传时间',"
             "`update_time` INT NOT NULL COMMENT '更新时间',"
             "`author_id` INT NOT NULL COMMENT '创建者',"
             "`content` VARCHAR(1024) NOT NULL COMMENT '信息内容',"
@@ -20,7 +21,8 @@ def create_short_message_table():
             "`effects` VARCHAR(64) DEFAULT '' COMMENT '影响品种',"
             "`note` VARCHAR(128) DEFAULT '' COMMENT '备注',"
             "`audit_mind` INT NOT NULL DEFAULT 0 COMMENT '审核意见',"
-            "`is_active` BIT NOT NULL DEFAULT 1"
+            "`is_active` BIT NOT NULL DEFAULT 1,"
+            "`is_edit` BIT NOT NULL DEFAULT 1"
             ") DEFAULT CHARSET='utf8';"
         )
 
@@ -34,13 +36,15 @@ def migrate_message():
         for item in messages:
             create_time = int(item['create_time'].timestamp())
             item['create_time'] = int(item['custom_time'].timestamp())
+            item['join_time'] = create_time
             item['update_time'] = create_time
             item['effects'] = item['effect_variety']
         # 保存
         cursor.executemany(
-            "INSERT INTO work_short_message (id,create_time,update_time,author_id,content,msg_type,effects,note)"
-            "VALUES (%(id)s,%(create_time)s,%(update_time)s,%(author_id)s,%(content)s,%(msg_type)s,%(effects)s,"
-            "%(note)s);",
+            "INSERT INTO work_short_message (id,create_time,join_time,update_time,author_id,"
+            "content,msg_type,effects,note)"
+            "VALUES (%(id)s,%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(content)s,"
+            "%(msg_type)s,%(effects)s,%(note)s);",
             messages
         )
 

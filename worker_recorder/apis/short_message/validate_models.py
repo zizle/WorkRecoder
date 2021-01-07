@@ -22,3 +22,9 @@ class QueryMsgBodyItem(BaseModel):
 class AuditMessageItem(BaseModel):
     user_token: str
     audit_mind: int
+
+
+# 批量删除本次上传的短讯通body参数
+class JoinTimeDelMsgItem(BaseModel):
+    user_token: str
+    join_time: int

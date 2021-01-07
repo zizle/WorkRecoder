@@ -23,8 +23,8 @@ async def user_all_amount(user_token: str = Query(...)):
     if 'admin' in access:
         user_id = 0
     # 获取起始日期
-    current_year = datetime.datetime.today().strftime('%Y-01-01')
-    # current_year = '2020-01-01'
+    # current_year = datetime.datetime.today().strftime('%Y-01-01')
+    current_year = '2020-01-01'
     start_timestamp, end_timestamp = get_year_range(current_year)
     # 获取短讯通的数据
     short_messages = get_messages(start_timestamp, end_timestamp, user_id)
