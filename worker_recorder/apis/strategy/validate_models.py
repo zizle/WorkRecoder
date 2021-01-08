@@ -43,6 +43,17 @@ class StrategyAddItem(BaseModel):
         return value
 
 
+# 修改一条策略的body验证
+class ModifyStrategyItem(BaseModel):
+    strategy_id: int
+    user_token: str
+    open_price: float
+    close_price: float
+    profit: float
+    is_running: int
+    note: str
+
+
 # 查询年度策略的post-body参数
 class QueryStrategyItem(BaseModel):
     user_token: str

@@ -16,7 +16,7 @@ from fastapi.encoders import jsonable_encoder
 from utils.encryption import decipher_user_token
 from utils.constants import VARIETY_CN
 from db import DBWorker
-from .validate_models import StrategyAddItem, QueryStrategyItem
+from .validate_models import StrategyAddItem, QueryStrategyItem, ModifyStrategyItem
 from apis.tools import validate_operate_user, validate_date_range, filter_records
 from .handler import handle_strategy_amount_rate
 
@@ -95,6 +95,21 @@ async def query_strategy(query_item: QueryStrategyItem = Body(...)):
     return {'message': '获取投顾策略成功!',
             'strategies': strategies, 'page': query_item.page, 'total_count': len(total_strategies),
             'statistics': statistics_result}
+
+
+@strategy_api.put('/modify/{strategy_id}/')
+async def modify_strategy_record(strategy_id: int, modify_item: ModifyStrategyItem = Body(...)):
+    user_id, is_audit = validate_operate_user(modify_item.user_token)
+    # 修改数据
+    update_timestamp = int(datetime.datetime.now().timestamp())
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "UPDATE work_strategy SET update_time=%s,open_price=%s,close_price=%s,profit=%s,note=%s,is_running=%s "
+            "WHERE id=%s AND author_id=%s;",
+            (update_timestamp, modify_item.open_price, modify_item.close_price, modify_item.profit, modify_item.note,
+             modify_item.is_running, strategy_id, user_id)
+        )
+    return {'message': '修改成功!', 'strategy': modify_item}
 
 
 @strategy_api.delete('/remove/{strategy_id}/')  # 用户或管理者删除一条投顾策略记录

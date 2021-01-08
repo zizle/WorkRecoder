@@ -73,7 +73,7 @@ async def get_user_year_total(user_token: str = Query(...)):
         raise HTTPException(status_code=401, detail='登录过期,请重新登录!')
     # 获取日期范围
     current_year = datetime.datetime.today().strftime('%Y-01-01')
-    # current_year = '2020-01-01'
+    current_year = '2020-01-01'
     start_timestamp, end_timestamp = get_year_range(current_year)
     if start_timestamp == 0:
         raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-01-01`.')

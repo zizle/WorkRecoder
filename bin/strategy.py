@@ -27,7 +27,7 @@ def create_strategy_table():
             "`is_active` BIT NOT NULL DEFAULT 1,"
             "`is_running` BIT NOT NULL DEFAULT 0,"
             "`is_edit` BIT NOT NULL DEFAULT 1"
-            ") DEFAULT CHARSET='utf8';"
+            ") DEFAULT CHARSET='utf8mb4';"
         )
 
 

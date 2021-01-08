@@ -20,7 +20,7 @@ def create_variety_table():
             "`exchange_id` INT NOT NULL COMMENT '交易所',"
             "`is_active` BIT NOT NULL DEFAULT 1,"
             "UNIQUE KEY `variety`(`variety_name`,`variety_en`)"
-            ") DEFAULT CHARSET='utf8';"
+            ") DEFAULT CHARSET='utf8mb4';"
         )
 
 
@@ -48,5 +48,5 @@ def migrate_variety():
 
 
 if __name__ == '__main__':
-    # create_variety_table()
+    create_variety_table()
     migrate_variety()
