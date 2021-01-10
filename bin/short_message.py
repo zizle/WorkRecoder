@@ -23,7 +23,7 @@ def create_short_message_table():
             "`audit_mind` INT NOT NULL DEFAULT 0 COMMENT '审核意见',"
             "`is_active` BIT NOT NULL DEFAULT 1,"
             "`is_edit` BIT NOT NULL DEFAULT 1"
-            ") DEFAULT CHARSET='utf8';"
+            ") DEFAULT CHARSET='utf8mb4';"
         )
 
 
