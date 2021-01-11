@@ -37,11 +37,15 @@ def validate_date_range(start_date, end_date):
 
 
 # 过滤数据
-def filter_records(is_audit, req_staff, keyword, records, total_records):
+def filter_records(
+        is_audit, req_staff, keyword, key_column, records, total_records
+):
     if is_audit and req_staff:
         records = list(filter(lambda x: x['author_id'] in req_staff, records))
+    if total_records:
         total_records = list(filter(lambda x: x['author_id'] in req_staff, total_records))
     if keyword:
-        records = list(filter(lambda x: keyword in x['content'], records))
-        total_records = list(filter(lambda x: keyword in x['content'], total_records))
+        records = list(filter(lambda x: keyword in x[key_column], records))
+    if total_records:
+        total_records = list(filter(lambda x: keyword in x[key_column], total_records))
     return records, total_records

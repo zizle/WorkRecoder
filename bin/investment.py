@@ -17,6 +17,7 @@ def create_investment_table():
             "CREATE TABLE IF NOT EXISTS `work_investment` ("
             "`id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT COMMENT 'ID',"
             "`create_time` INT NOT NULL COMMENT '创建方案',"
+            "`join_time` INT NOT NULL COMMENT '上传时间',"
             "`update_time` INT NOT NULL COMMENT '更新日期',"
             "`author_id` INT NOT NULL COMMENT '用户ID',"
             "`title` VARCHAR(128) NOT NULL COMMENT '方案标题',"
@@ -34,8 +35,9 @@ def create_investment_table():
             "`annex` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '附件',"
             "`annex_url` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '附件URL',"
             "`is_publish` BIT NOT NULL DEFAULT 1 COMMENT '是否外发',"
+            "`is_running` BIT NOT NULL DEFAULT 0 COMMENT '状态',"
             "`is_active` BIT NOT NULL DEFAULT 1 COMMENT '有效'"
-            ") DEFAULT CHARSET='utf8';"
+            ") DEFAULT CHARSET='utf8mb4';"
         )
 
 
@@ -47,9 +49,11 @@ def migrate_investment():
             "INNER JOIN variety AS vartb ON vartb.id=investb.variety_id;"
         )
         investment = cursor.fetchall()
+
         for item in investment:
             create_time = item['create_time']
             item['create_time'] = int(item['custom_time'].timestamp())
+            item['join_time'] = int(create_time.timestamp())
             item['update_time'] = int(create_time.timestamp())
             item['build_time'] = int(item['build_time'].timestamp())
             item['expire_time'] = int(item['expire_time'].timestamp())
@@ -58,11 +62,12 @@ def migrate_investment():
             item['annex_url'] = item['annex_url'].replace('fileStore', 'annex')
         # 保存
         cursor.executemany(
-            "INSERT INTO work_investment (id,create_time,update_time,author_id,title,variety_en,contract,direction,"
-            "build_price,out_price,build_hands,cutloss_price,expire_time,profit,note,score,annex,annex_url,is_publish)"
-            "VALUES (%(id)s,%(create_time)s,%(update_time)s,%(author_id)s,%(title)s,%(variety_en)s,%(contract)s,"
-            "%(direction)s,%(build_price)s,%(out_price)s,%(build_hands)s,%(cutloss_price)s,%(expire_time)s,%(profit)s,"
-            "%(note)s,%(score)s,%(annex)s,%(annex_url)s,%(is_publish)s);",
+            "INSERT INTO work_investment (id,create_time,join_time,update_time,author_id,title,variety_en,contract,"
+            "direction,build_price,out_price,build_hands,cutloss_price,expire_time,profit,note,score,"
+            "annex,annex_url,is_publish)"
+            "VALUES (%(id)s,%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(title)s,%(variety_en)s,"
+            "%(contract)s,%(direction)s,%(build_price)s,%(out_price)s,%(build_hands)s,%(cutloss_price)s,"
+            "%(expire_time)s,%(profit)s,%(note)s,%(score)s,%(annex)s,%(annex_url)s,%(is_publish)s);",
             investment
         )
 

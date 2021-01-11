@@ -85,7 +85,7 @@ async def query_strategy(query_item: QueryStrategyItem = Body(...)):
         )
         total_strategies = cursor.fetchall()
     strategies, total_strategies = filter_records(
-        is_audit, query_item.req_staff, query_item.keyword, strategies, total_strategies)
+        is_audit, query_item.req_staff, query_item.keyword, 'content', strategies, total_strategies)
     # 统计计算结果数据
     statistics_result = handle_strategy_amount_rate(pd.DataFrame(strategies))
     # 截取数据(分页)
