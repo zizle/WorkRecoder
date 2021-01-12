@@ -9,12 +9,6 @@
 
 from worker_recorder.db import DBWorker
 
-SCORES = {
-    'A': 5,
-    'B': 4,
-    'C': 3
-}
-
 
 def create_abnormal_table():
     with DBWorker() as (_, cursor):
@@ -22,6 +16,7 @@ def create_abnormal_table():
             "CREATE TABLE IF NOT EXISTS `work_abnormal` ("
             "`id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT COMMENT 'ID',"
             "`create_time` INT NOT NULL COMMENT '创建方案',"
+            "`join_time` INT NOT NULL COMMENT '上传时间',"
             "`update_time` INT NOT NULL COMMENT '更新日期',"
             "`author_id` INT NOT NULL COMMENT '用户ID',"
             "`title` VARCHAR(128) NOT NULL COMMENT '标题',"
@@ -38,7 +33,7 @@ def create_abnormal_table():
             "`annex_url` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '附件URL',"
             "`is_examined` BIT NOT NULL DEFAULT 1 COMMENT '审核状态',"
             "`is_active` BIT NOT NULL DEFAULT 1 COMMENT '有效'"
-            ") DEFAULT CHARSET='utf8';"
+            ") DEFAULT CHARSET='utf8mb4';"
         )
 
 
@@ -52,15 +47,16 @@ def migrate_abnormal():
             create_time = item['create_time']
             item['create_time'] = int(item['custom_time'].timestamp())
             item['update_time'] = int(create_time.timestamp())
-            item['score'] = 0,
-            item['annex_url'] = item['annex_url'].replace('fileStore', 'annex')
+            item['join_time'] = int(create_time.timestamp())
+            item['score'] = 3,
+            item['annex_url'] = item['annex_url'].replace('fileStore', 'Annexes')
             item['phone'] = item['tel_number']
         # 保存
         cursor.executemany(
-            "INSERT INTO work_abnormal (id,create_time,update_time,author_id,title,task_type,sponsor,applicant,"
-            "phone,swiss_coin,allowance,partner,note,score,annex,annex_url,is_examined)"
-            "VALUES (%(id)s,%(create_time)s,%(update_time)s,%(author_id)s,%(title)s,%(task_type)s,%(sponsor)s,"
-            "%(applicant)s,%(phone)s,%(swiss_coin)s,%(allowance)s,%(partner)s,"
+            "INSERT INTO work_abnormal (id,create_time,join_time,update_time,author_id,title,task_type,sponsor,"
+            "applicant,phone,swiss_coin,allowance,partner,note,score,annex,annex_url,is_examined)"
+            "VALUES (%(id)s,%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(title)s,%(task_type)s,"
+            "%(sponsor)s,%(applicant)s,%(phone)s,%(swiss_coin)s,%(allowance)s,%(partner)s,"
             "%(note)s,%(score)s,%(annex)s,%(annex_url)s,%(is_examined)s);",
             abnormal
         )
