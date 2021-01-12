@@ -13,7 +13,7 @@ def get_hot_article(start_timestamp: int, end_timestamp: int, author_id: int):
     with DBWorker() as (_, cursor):
         cursor.execute(
             "SELECT artb.*,usertb.id AS user_id,usertb.username "
-            "FROM wrok_article AS artb "
+            "FROM work_article AS artb "
             "INNER JOIN user_user AS usertb ON artb.author_id=usertb.id "
             "WHERE artb.create_time>=%s AND artb.create_time<%s AND IF(0=%s,TRUE,artb.author_id=%s);",
             (start_timestamp, end_timestamp, author_id, author_id)
@@ -39,7 +39,7 @@ def handle_article_amount_score(article_df):
 
 
 # 将投资方案按月统计出数量
-def handle_investment_amount(article_df, s_type):
+def handle_article_amount(article_df, s_type):
     if article_df.empty:
         return []
     if s_type == 'month':
