@@ -48,7 +48,7 @@ def migrate_abnormal():
             item['create_time'] = int(item['custom_time'].timestamp())
             item['update_time'] = int(create_time.timestamp())
             item['join_time'] = int(create_time.timestamp())
-            item['score'] = 3,
+            item['score'] = 5,
             item['annex_url'] = item['annex_url'].replace('fileStore', 'Annexes')
             item['phone'] = item['tel_number']
         # 保存

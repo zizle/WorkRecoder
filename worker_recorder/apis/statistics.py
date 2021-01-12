@@ -14,6 +14,7 @@ from apis.short_message.handler import get_messages, handle_detail_amount
 from apis.strategy.handler import get_strategy, handle_strategy_amount
 from apis.investment.hanlder import get_investment, handle_investment_amount
 from apis.abnormal.hanlder import get_abnormal_work, handle_abnormal_work_amount
+from apis.hot_article.hanlder import get_hot_article, handle_article_amount
 
 
 statistics_router = APIRouter()
@@ -88,7 +89,7 @@ def get_investment_statistics_data(start_timestamp, end_timestamp, user_id):
     # print(statistics_messages)
     ivst_statistics_df = pd.DataFrame(statistics_investment)  # 转dataFrame计算每列的和
     if ivst_statistics_df.empty:
-        strategy_data = {
+        ivst_data = {
             'series_name': '投资方案',
             'area_color': '#ff9900',
             'series_data': []
@@ -118,7 +119,7 @@ def get_abnormal_statistics_data(start_timestamp, end_timestamp, user_id):
     # print(statistics_messages)
     abwk_statistics_df = pd.DataFrame(abnormal_works)  # 转dataFrame计算每列的和
     if abwk_statistics_df.empty:
-        strategy_data = {
+        abwk_data = {
             'series_name': '非常态工作',
             'area_color': '#ed3f14',
             'series_data': []
@@ -140,6 +141,35 @@ def get_abnormal_statistics_data(start_timestamp, end_timestamp, user_id):
     return abwk_data
 
 
+def get_article_statistics_data(start_timestamp, end_timestamp, user_id):
+    # 统计热点文章
+    hot_articles = get_hot_article(start_timestamp, end_timestamp, user_id)
+    # 按月分组处理数据
+    hot_articles = handle_article_amount(pd.DataFrame(hot_articles), 'year')
+    article_statistics_df = pd.DataFrame(hot_articles)  # 转dataFrame计算每列的和
+    if article_statistics_df.empty:
+        article_data = {
+            'series_name': '热点文章',
+            'area_color': '#9a66e4',
+            'series_data': []
+        }
+    else:
+        # 删除author_id 和 username列
+        del article_statistics_df['author_id']
+        del article_statistics_df['username']
+        # 求和
+        article_statistics_df.loc['col_sum'] = article_statistics_df.sum()
+        # 得到短讯通的数据
+        article_statistics_df.sort_index(axis=1, inplace=True)
+        article_amount = article_statistics_df.tail(1).to_dict(orient='records')[0]
+        article_data = {
+            'series_name': '热点文章',
+            'area_color': '#9a66e4',
+            'series_data': [{'month': k, 'count': v} for k, v in article_amount.items()]
+        }
+    return article_data
+
+
 @statistics_router.get('/month-count/')
 async def user_all_amount(user_token: str = Query(...)):
     user_id, access = decipher_user_token(user_token)
@@ -156,8 +186,9 @@ async def user_all_amount(user_token: str = Query(...)):
     strategy_data = get_strategy_statistics_data(start_timestamp, end_timestamp, user_id)
     investment_data = get_investment_statistics_data(start_timestamp, end_timestamp, user_id)
     abnormal_work_data = get_abnormal_statistics_data(start_timestamp, end_timestamp, user_id)
+    hot_article_data = get_article_statistics_data(start_timestamp, end_timestamp, user_id)
 
-    data = [short_message_data, strategy_data, investment_data, abnormal_work_data]
+    data = [short_message_data, strategy_data, investment_data, abnormal_work_data, hot_article_data]
 
     # for d in data:
     #     print(d)

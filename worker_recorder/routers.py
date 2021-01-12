@@ -9,6 +9,7 @@ from apis.short_message import short_message_router         # 短信通api
 from apis.strategy import strategy_router                   # 投顾策略api
 from apis.investment import investment_router               # 投资方案api
 from apis.abnormal import abnormal_router                   # 非常规工作api
+from apis.hot_article import article_router                 # 热点文章api
 from apis.statistics import statistics_router
 
 
@@ -21,3 +22,4 @@ routers.include_router(short_message_router, prefix='/shtmsg')
 routers.include_router(strategy_router, prefix='/strategy')
 routers.include_router(investment_router, prefix='/investment')
 routers.include_router(abnormal_router, prefix='/abnormal')
+routers.include_router(article_router, prefix='/article')
