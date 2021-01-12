@@ -120,27 +120,26 @@ async def modify_investment(investment_id: int,
         if not investment_obj:
             raise HTTPException(status_code=400, detail='investment item Not Found')
         # 有附件，删除原来的附件并保存现在的附件
-        if investment_obj['annex_url']:
+        if annex_file:
             old_annex_url = os.path.join(STATICS_STORAGE, investment_obj['annex_url'])
+            save_path, sql_path = get_file_paths('INVESTMENT', user_id, annex_file.filename)
+
+            body_content['annex'] = annex_file.filename
+            body_content['annex_url'] = sql_path
+            cursor.execute(
+                "UPDATE work_investment SET out_price=%(out_price)s,cutloss_price=%(cutloss_price)s,"
+                "profit=%(profit)s,is_running=%(is_running)s,score=%(score)s,note=%(note)s,"
+                "annex=%(annex)s,annex_url=%(annex_url)s "
+                "WHERE id=%(investment_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
+                " LIMIT 1;",
+                body_content
+            )
+            # 保存附件到指定文件
+            file_content = await annex_file.read()
+            with open(save_path, 'wb') as fp:
+                fp.write(file_content)
+            await annex_file.close()
             if annex_file and os.path.exists(old_annex_url) and os.path.isfile(old_annex_url):
-                save_path, sql_path = get_file_paths('INVESTMENT', user_id, annex_file.filename)
-
-                body_content['annex'] = annex_file.filename
-                body_content['annex_url'] = sql_path
-                cursor.execute(
-                    "UPDATE work_investment SET out_price=%(out_price)s,cutloss_price=%(cutloss_price)s,"
-                    "profit=%(profit)s,is_running=%(is_running)s,score=%(score)s,note=%(note)s,"
-                    "annex=%(annex)s,annex_url=%(annex_url)s "
-                    "WHERE id=%(investment_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
-                    " LIMIT 1;",
-                    body_content
-                )
-                # 保存附件到指定文件
-                file_content = await annex_file.read()
-                with open(save_path, 'wb') as fp:
-                    fp.write(file_content)
-                await annex_file.close()
-
                 os.remove(old_annex_url)  # 移除旧文件
         # 没有附件,只更新其他字段
         else:
