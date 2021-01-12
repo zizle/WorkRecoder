@@ -1,32 +1,26 @@
 # _*_ coding:utf-8 _*_
 # @File  : statistics.py
-# @Time  : 2021-01-07 11:03
+# @Time  : 2021-01-12 08:00
 # @Author: zizle
 
-# 投顾策略的统计
-
-# 1. 按月统计每人的投顾策略数量、成功量、成功率、收益、收益率
-# 2. 按年统计每人的投顾策略数量、成功量、成功率、收益、收益率
+# 统计投资方案记录
 
 import datetime
 import pandas as pd
 from fastapi import APIRouter, Query, HTTPException
-
 from utils.time_handler import get_month_range, get_year_range
 from utils.encryption import decipher_user_token
-from .handler import get_strategy, handle_strategy_amount_rate
+from .hanlder import get_investment, handle_investment_amount_rate
 
 statistics_api = APIRouter()
 
-
-@statistics_api.get('/month/')  # 按月统计每人的投顾策略数量、成功量、成功率、收益、收益率
+@statistics_api.get('/month/')  # 按月统计每人的投资方案数量
 async def get_month_statistics(query_date: str = Query(...)):
     start_timestamp, end_timestamp = get_month_range(query_date)
     if start_timestamp == 0:
         raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-%m-01`.')
-    strategies = get_strategy(start_timestamp, end_timestamp, 0)
-    # 转为DataFrame进行数据处理
-    result = handle_strategy_amount_rate(pd.DataFrame(strategies))
+    investments = get_investment(start_timestamp, end_timestamp, 0)
+    result = handle_investment_amount_rate(pd.DataFrame(investments))
     return {'message': '统计成功!', 'statistics': result}
 
 
@@ -35,13 +29,13 @@ async def get_year_statistics(query_date: str = Query(...)):
     start_timestamp, end_timestamp = get_year_range(query_date)
     if start_timestamp == 0:
         raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-01-01`.')
-    strategies = get_strategy(start_timestamp, end_timestamp, 0)
+    strategies = get_investment(start_timestamp, end_timestamp, 0)
     # 转为DataFrame进行数据处理
-    result = handle_strategy_amount_rate(pd.DataFrame(strategies))
+    result = handle_investment_amount_rate(pd.DataFrame(strategies))
     return {'message': '统计成功!', 'statistics': result}
 
 
-@statistics_api.get('/year-total/')  # 按年累计请求者的投顾策略数量(请求者=admin则为所有人的数量)
+@statistics_api.get('/year-total/')  # 按年累计请求者的投资方案数量(请求者=admin则为所有人的数量)
 async def get_user_year_total(user_token: str = Query(...)):
     # 解析出用户
     user_id, access = decipher_user_token(user_token)
@@ -53,7 +47,8 @@ async def get_user_year_total(user_token: str = Query(...)):
     start_timestamp, end_timestamp = get_year_range(current_year)
     if start_timestamp == 0:
         raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-01-01`.')
-    records = get_strategy(start_timestamp, end_timestamp, 0)
+
+    records = get_investment(start_timestamp, end_timestamp, 0)
     record_df = pd.DataFrame(records)
     if record_df.empty:
         return {'message': '统计成功!', 'total_count': 0, 'percent': '-'}
@@ -62,7 +57,7 @@ async def get_user_year_total(user_token: str = Query(...)):
         user_count = total_count
         percent = 100 if total_count else 0
     else:
-        # 选取用户的投顾策略
+        # 选取用户的投资策略
         user_record_df = record_df[record_df['author_id'] == user_id]
         user_count = user_record_df.shape[0]
         percent = round(user_count / total_count * 100, 2) if total_count else 0

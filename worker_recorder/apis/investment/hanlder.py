@@ -1,6 +1,6 @@
 # _*_ coding:utf-8 _*_
-# @File  : handler.py
-# @Time  : 2021-01-07 11:19
+# @File  : hanlder.py
+# @Time  : 2021-01-12 08:01
 # @Author: zizle
 
 import datetime
@@ -8,67 +8,70 @@ import pandas as pd
 from db import DBWorker
 
 
-def get_strategy(start_timestamp: int, end_timestamp: int, author_id: int):
+def get_investment(start_timestamp: int, end_timestamp: int, author_id: int):
+    # 查询数据
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT * "
-            "FROM work_strategy AS stb "
-            "INNER JOIN user_user AS usertb ON stb.author_id=usertb.id "
-            "WHERE stb.create_time>=%s AND stb.create_time<%s AND IF(0=%s,TRUE,stb.author_id=%s);",
+            "SELECT ivtb.*,usertb.id AS user_id,usertb.username "
+            "FROM work_investment AS ivtb "
+            "INNER JOIN user_user AS usertb ON ivtb.author_id=usertb.id "
+            "WHERE ivtb.create_time>=%s AND ivtb.create_time<%s AND IF(0=%s,TRUE,ivtb.author_id=%s);",
             (start_timestamp, end_timestamp, author_id, author_id)
         )
-        strategies = cursor.fetchall()
-    return strategies
+        investments = cursor.fetchall()
+    return investments
 
 
-# 按作者处理统计投顾策略数量和成功率排名
-def handle_strategy_amount_rate(strategy_df):
-    if strategy_df.empty:
+def handle_investment_amount_rate(investment_df, ):
+    if investment_df.empty:
         return []
-    # 去除运行中的策略
-    strategy_df = strategy_df[strategy_df['is_running'] == 0]
-    if strategy_df.empty:
+    # 只统计已结束的方案
+    investment_df = investment_df[investment_df['is_running'] == 0]
+    if investment_df.empty:
         return []
+    # 计算每条方案收益率
+    investment_df['profit_rate'] = investment_df['profit'] / 1000000
 
     # 1 计算各人员的策略数量
-    amount_count_df = strategy_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+    amount_count_df = investment_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
         {'total_count': 'count'})
 
-    # 2 计算各人员的成功策略数量
-    # 筛选收益率>0的条目
-    success_df = strategy_df[strategy_df['profit'] > 0]
+    # 2 计算各人员成功的方案数量,也就是盈利的方案数量
+    # 选取收益>0的条目
+    success_df = investment_df[investment_df['profit'] > 0]
     # 统计各人员的成功数量
     success_count_df = success_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
         {'success_count': 'count'})
 
-    # **合并各人员策略数量与成功数量数据框
+    # ** 合并各人员的方案数量与成功的数量为新的数据框
     result_df = pd.merge(amount_count_df, success_count_df, on=['author_id', 'username'], how='left')
 
-    # 3 计算算术平均收益率
-    # 计算每条策略的收益率
-    strategy_df['profit_rate'] = strategy_df['profit'] / 100000
-    # 分组合计每人的收益、收益率加和
-    avg_profit_df = strategy_df.groupby(by=['author_id', 'username'])[['profit', 'profit_rate']].sum()
+    # 3 计算算术平均收益率和得分
+    # 分组合计每人的收益、收益率、得分加和
+    # 转数据类型(score原为int,而其他为decimal会丢失)
+    investment_df[['profit', 'score', 'profit_rate']] = investment_df[['profit', 'score', 'profit_rate']].astype(float)
+    avg_profit_df = investment_df.groupby(by=['author_id', 'username'], as_index=False)[['profit', 'score', 'profit_rate']].sum()
     avg_profit_df = avg_profit_df.reset_index()
-    avg_profit_df = avg_profit_df.rename(columns={'profit': 'sum_profit', 'profit_rate': 'sum_profit_rate'})
-
+    avg_profit_df = avg_profit_df.rename(
+        columns={'profit': 'sum_profit', 'profit_rate': 'sum_profit_rate', 'score': 'sum_score'})
     # **将数量数据框与平均收益数据框合并
     result_df = pd.merge(result_df, avg_profit_df, on=['author_id', 'username'], how='left')
     # 计算平均收益率
     result_df['avg_profit_rate'] = result_df['sum_profit_rate'] / result_df['total_count']
-    # 删除收益率算术平均和的列避免混淆
-    # 4. 计算累计收益率（暂时认定就是所有记录的的收益和 / 10万 * 条数 = 每个记录的收益率加总）
+
+    # 4. 计算累计收益率（暂时认定就是所有记录的的收益和 / 100万 * 条数 = 每个记录的收益率加总）
 
     # 5. 计算成功率
     result_df['success_rate'] = result_df['success_count'] / result_df['total_count']
 
     result_df.fillna(0, inplace=True)
+
     return result_df.to_dict(orient='records')
 
 
-# 将投顾策略按月统计出数量
-def handle_strategy_amount(strategy_df, s_type):
-    if strategy_df.empty:
+# 将投资方案按月统计出数量
+def handle_investment_amount(investment_df, s_type):
+    if investment_df.empty:
         return []
     if s_type == 'month':
         timestamp_format = '%Y-%m-%d'
@@ -76,10 +79,10 @@ def handle_strategy_amount(strategy_df, s_type):
         timestamp_format = '%Y-%m'
     else:
         return []
-    strategy_df['create_time'] = strategy_df['create_time'].apply(
+    investment_df['create_time'] = investment_df['create_time'].apply(
         lambda x: datetime.datetime.fromtimestamp(x).strftime(timestamp_format))
     # 以人员日期格式进行分组统计
-    author_date_count_df = strategy_df.groupby(['author_id', 'username', 'create_time'], as_index=False)[
+    author_date_count_df = investment_df.groupby(['author_id', 'username', 'create_time'], as_index=False)[
         'author_id'].agg({'count': 'count'})
     author_date_count_df['author_id'] = author_date_count_df['author_id'].astype(int)
     author_date_count_df['count'] = author_date_count_df['count'].astype(int)

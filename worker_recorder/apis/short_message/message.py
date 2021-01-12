@@ -144,7 +144,7 @@ async def query_short_message(body_item: QueryMsgBodyItem):
         )
         total_messages = cursor.fetchall()
     messages, total_messages = filter_records(
-        is_audit, body_item.req_staff, body_item.keyword, messages, total_messages)
+        is_audit, body_item.req_staff, body_item.keyword, 'content', messages, total_messages)
     # 截取数据(分页)
     messages = messages[(body_item.page - 1) * body_item.page_size: body_item.page_size * body_item.page]
     # 处理数据内容
