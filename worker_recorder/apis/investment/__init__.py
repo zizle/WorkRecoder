@@ -5,8 +5,10 @@
 
 from fastapi import APIRouter
 from .investment import investment_api
+from .statistics import statistics_api
 
 
 investment_router = APIRouter()
 
 investment_router.include_router(investment_api)
+investment_router.include_router(statistics_api, prefix='/statistics')

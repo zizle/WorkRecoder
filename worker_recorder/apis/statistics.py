@@ -12,6 +12,7 @@ from utils.encryption import decipher_user_token
 from utils.time_handler import get_year_range
 from apis.short_message.handler import get_messages, handle_detail_amount
 from apis.strategy.handler import get_strategy, handle_strategy_amount
+from apis.investment.hanlder import get_investment, handle_investment_amount
 
 statistics_router = APIRouter()
 
@@ -75,6 +76,35 @@ def get_strategy_statistics_data(start_timestamp, end_timestamp, user_id):
     return strategy_data
 
 
+def get_investment_statistics_data(start_timestamp, end_timestamp, user_id):
+    # 统计投资方案的数据
+    investments = get_investment(start_timestamp, end_timestamp, user_id)
+    # 按月分组处理数据
+    statistics_investment = handle_detail_amount(pd.DataFrame(investments), 'year')
+    # print(statistics_messages)
+    ivst_statistics_df = pd.DataFrame(statistics_investment)  # 转dataFrame计算每列的和
+    if ivst_statistics_df.empty:
+        strategy_data = {
+            'series_name': '投资方案',
+            'area_color': '#ff9900',
+            'series_data': []
+        }
+    else:
+        # 删除author_id 和 username列
+        del ivst_statistics_df['author_id']
+        del ivst_statistics_df['username']
+        # 求和
+        ivst_statistics_df.loc['col_sum'] = ivst_statistics_df.sum()
+        # 得到短讯通的数据
+        strategy_amount = ivst_statistics_df.tail(1).to_dict(orient='records')[0]
+        strategy_data = {
+            'series_name': '投资方案',
+            'area_color': '#ff9900',
+            'series_data': [{'month': k, 'count': v} for k, v in strategy_amount.items()]
+        }
+    return strategy_data
+
+
 @statistics_router.get('/month-count/')
 async def user_all_amount(user_token: str = Query(...)):
     user_id, access = decipher_user_token(user_token)
@@ -89,8 +119,9 @@ async def user_all_amount(user_token: str = Query(...)):
 
     short_message_data = get_message_statistics_data(start_timestamp, end_timestamp, user_id)
     strategy_data = get_strategy_statistics_data(start_timestamp, end_timestamp, user_id)
+    investment_data = get_investment_statistics_data(start_timestamp, end_timestamp, user_id)
 
-    data = [short_message_data, strategy_data]
+    data = [short_message_data, strategy_data, investment_data]
 
     return {'message': '统计成功!', 'data': data}
 
