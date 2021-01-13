@@ -180,7 +180,7 @@ def get_onduty_message_statistics_data(start_timestamp, end_timestamp, user_id):
     if record_statistics_df.empty:
         record_data = {
             'series_name': '值班信息',
-            'area_color': '#bf9000',
+            'area_color': '#E46CBB',
             'series_data': []
         }
     else:
@@ -194,7 +194,7 @@ def get_onduty_message_statistics_data(start_timestamp, end_timestamp, user_id):
         article_amount = record_statistics_df.tail(1).to_dict(orient='records')[0]
         record_data = {
             'series_name': '值班信息',
-            'area_color': '#bf9000',
+            'area_color': '#E46CBB',
             'series_data': [{'month': k, 'count': v} for k, v in article_amount.items()]
         }
     return record_data
