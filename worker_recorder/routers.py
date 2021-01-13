@@ -11,6 +11,7 @@ from apis.investment import investment_router               # 投资方案api
 from apis.abnormal import abnormal_router                   # 非常规工作api
 from apis.hot_article import article_router                 # 热点文章api
 from apis.onduty_message import onduty_message_router       # 值班信息api
+from apis.income_point import income_point_router           # 收入指标api
 from apis.statistics import statistics_router
 
 
@@ -25,3 +26,4 @@ routers.include_router(investment_router, prefix='/investment')
 routers.include_router(abnormal_router, prefix='/abnormal')
 routers.include_router(article_router, prefix='/article')
 routers.include_router(onduty_message_router, prefix='/onduty')
+routers.include_router(income_point_router, prefix='/income')
