@@ -15,6 +15,7 @@ from apis.strategy.handler import get_strategy, handle_strategy_amount
 from apis.investment.hanlder import get_investment, handle_investment_amount
 from apis.abnormal.hanlder import get_abnormal_work, handle_abnormal_work_amount
 from apis.hot_article.hanlder import get_hot_article, handle_article_amount
+from apis.onduty_message.hanlder import get_onduty_message, handle_onduty_message_point_amount
 
 
 statistics_router = APIRouter()
@@ -170,6 +171,35 @@ def get_article_statistics_data(start_timestamp, end_timestamp, user_id):
     return article_data
 
 
+def get_onduty_message_statistics_data(start_timestamp, end_timestamp, user_id):
+    # 统计值班信息
+    records = get_onduty_message(start_timestamp, end_timestamp, user_id)
+    # 按月分组处理数据
+    records = handle_onduty_message_point_amount(pd.DataFrame(records), 'year')
+    record_statistics_df = pd.DataFrame(records)  # 转dataFrame计算每列的和
+    if record_statistics_df.empty:
+        record_data = {
+            'series_name': '值班信息',
+            'area_color': '#bf9000',
+            'series_data': []
+        }
+    else:
+        # 删除author_id 和 username列
+        del record_statistics_df['author_id']
+        del record_statistics_df['username']
+        # 求和
+        record_statistics_df.loc['col_sum'] = record_statistics_df.sum()
+        # 得到值班信息
+        record_statistics_df.sort_index(axis=1, inplace=True)
+        article_amount = record_statistics_df.tail(1).to_dict(orient='records')[0]
+        record_data = {
+            'series_name': '值班信息',
+            'area_color': '#bf9000',
+            'series_data': [{'month': k, 'count': v} for k, v in article_amount.items()]
+        }
+    return record_data
+
+
 @statistics_router.get('/month-count/')
 async def user_all_amount(user_token: str = Query(...)):
     user_id, access = decipher_user_token(user_token)
@@ -187,8 +217,10 @@ async def user_all_amount(user_token: str = Query(...)):
     investment_data = get_investment_statistics_data(start_timestamp, end_timestamp, user_id)
     abnormal_work_data = get_abnormal_statistics_data(start_timestamp, end_timestamp, user_id)
     hot_article_data = get_article_statistics_data(start_timestamp, end_timestamp, user_id)
+    onduty_message_data = get_onduty_message_statistics_data(start_timestamp, end_timestamp, user_id)
 
-    data = [short_message_data, strategy_data, investment_data, abnormal_work_data, hot_article_data]
+    data = [short_message_data, strategy_data, investment_data, abnormal_work_data, hot_article_data,
+            onduty_message_data]
 
     # for d in data:
     #     print(d)
