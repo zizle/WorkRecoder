@@ -3,6 +3,17 @@
 import os
 import platform
 
+"""
+# 各模块的权限验证字符串
+1. 短讯通(short_message):  short_message
+2. 投顾策略(strategy):     strategy
+3. 投资方案(investment):   investment
+4. 非常规工作(abnormal):   abnormal_work
+5. 收入指标(income_point): revenue
+6. 热点文章(hot_article):  article
+"""
+
+
 APP_DIR = os.path.dirname(os.path.abspath(__file__))  # 项目根路径
 SECRET_KEY = "c7jgb1k2xzfq*3odq5my-vts^+cv+p7suw+(_5#va%f0=tt5mp"
 

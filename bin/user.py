@@ -16,6 +16,7 @@ def create_user_table():
             "`join_time` INT NOT NULL COMMENT '加入日期',"
             "`update_time` INT NOT NULL COMMENT '最近登录',"
             "`username` VARCHAR(32) NOT NULL COMMENT '用户名',"
+            "`avatar` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '头像',"
             "`fixed_code` VARCHAR(20) NOT NULL COMMENT '用户号',"
             "`password` VARCHAR(32) NOT NULL COMMENT 'hash密码',"
             "`phone` CHAR(11) NOT NULL UNIQUE COMMENT '手机号',"
