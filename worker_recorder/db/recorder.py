@@ -10,7 +10,7 @@ from .db_pool import pool
 
 class DBWorker(object):
     def __init__(self):
-        print('连接池的ID:', id(pool))
+        # print('连接池的ID:', id(pool))
         # 从连接池取得一个连接
         self.conn = pool.connection()
         # 获取连接游标
@@ -27,8 +27,8 @@ class DBWorker(object):
             self.conn.commit()
         # 将连接放回线程池
         self.cursor.close()
-        print('游标关闭')
+        # print('游标关闭')
         self.conn.close()
-        print('连接放回')
+        # print('连接放回')
 
 

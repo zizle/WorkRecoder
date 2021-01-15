@@ -12,7 +12,8 @@ from utils.file_hands import get_file_paths
 from db import DBWorker
 from settings import APP_HOST, STATICS_STORAGE
 from .validate_models import (AbnormalWorkAddItem, get_abnormal_content_item, QueryAbnormalItem,
-                              AbnormalModifyBodyItem, get_abnormal_modify_item)
+                              AbnormalModifyBodyItem, get_abnormal_modify_item,
+                              AuditAbnormalItem)
 
 
 abnormal_api = APIRouter()
@@ -56,10 +57,10 @@ async def add_abnormal_work(annex_file: UploadFile = Form(None),
     with DBWorker() as (_, cursor):
         count = cursor.execute(
             "INSERT INTO work_abnormal (create_time,join_time,update_time,author_id,title,task_type,sponsor,"
-            "applicant,phone,swiss_coin,allowance,partner,note,score,annex,annex_url) "
+            "applicant,phone,swiss_coin,allowance,partner,note,annex,annex_url) "
             "VALUES (%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(title)s,"
             "%(task_type)s,%(sponsor)s,%(applicant)s,%(phone)s,%(swiss_coin)s,%(allowance)s,%(partner)s,"
-            "%(note)s,%(score)s,%(annex)s,%(annex_url)s);",
+            "%(note)s,%(annex)s,%(annex_url)s);",
             body_content
         )
         if count < 1 and save_path and os.path.exists(save_path) and os.path.isfile(save_path):
@@ -69,7 +70,7 @@ async def add_abnormal_work(annex_file: UploadFile = Form(None),
 
 
 @abnormal_api.post('/')  # 查询用户指定范围内的非常规工作,并返回结果
-async def get_investment(query_item: QueryAbnormalItem = Body(...)):
+async def get_abnormal_work(query_item: QueryAbnormalItem = Body(...)):
     # 验证用户
     audit = 'abnormal' if query_item.is_audit else None
     user_id, is_audit = validate_operate_user(query_item.user_token, audit)
@@ -88,7 +89,7 @@ async def get_investment(query_item: QueryAbnormalItem = Body(...)):
     abnormal_works, _ = filter_records(
         is_audit, query_item.req_staff, query_item.keyword, 'title', abnormal_works, [])
     abnormal_works = list(map(handle_abnormal_item, abnormal_works))
-    return {'message': '获取投资方案成功!', 'abnormal_works': abnormal_works}
+    return {'message': '获取非常规工作成功!', 'abnormal_works': abnormal_works}
 
 
 @abnormal_api.put('/modify/{abnormal_id}/')  # 用户修改一条非常规工作的信息
@@ -96,7 +97,6 @@ async def modify_investment(abnormal_id: int,
                             annex_file: UploadFile = Form(None),
                             body_item: AbnormalModifyBodyItem = Depends(get_abnormal_modify_item)):
     # 验证用户
-    print(body_item)
     user_id, is_audit = validate_operate_user(body_item.user_token, 'abnormal')
     body_content = jsonable_encoder(body_item)
     now_timestamp = int(datetime.datetime.now().timestamp())
@@ -144,6 +144,23 @@ async def modify_investment(abnormal_id: int,
                 body_content
             )
     return {'message': '修改成功!'}
+
+
+@abnormal_api.put('/audit/{abnormal_id}/')   # 管理员修改一条非常规工作的分数和有效状态
+async def audit_abnormal_record(audit_item: AuditAbnormalItem = Body(...)):
+    user_id, is_audit = validate_operate_user(audit_item.user_token, 'abnormal')
+    if not user_id:
+        raise HTTPException(status_code=401, detail='登录已过期!请重新登录!')
+    if not is_audit:
+        raise HTTPException(status_code=403, detail='没有权限进行此操作!')
+    # 修改分数和状态
+    is_examined = 1 if audit_item.is_examined else 0
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "UPDATE work_abnormal SET score=%s, is_examined=%s WHERE id=%s;",
+            (audit_item.score, is_examined, audit_item.abnormal_id)
+        )
+    return {'message': '修改成功!', 'score': audit_item.score, 'is_examined': audit_item.is_examined}
 
 
 @abnormal_api.delete('/remove/{abnormal_id}/')  # 用户或管理者删除一条非常规工作
