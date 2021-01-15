@@ -8,14 +8,18 @@
 # 3. 管理用户的列表
 # 4. 添加一个用户
 # 5. 设置一个用户的模块管理权限
+# 6. 用户设置头像
 
+import os
 import datetime
-from fastapi import APIRouter, Query, Body, HTTPException
+from fastapi import APIRouter, Query, Body, HTTPException, UploadFile, Form
 
 from db import DBWorker
 from settings import APP_HOST
 from utils.encryption import encrypt_password, generate_user_token, decipher_user_token, genetate_user_fixed_code
 from utils.constants import ORGANIZATIONS
+from utils.file_hands import get_file_paths
+from settings import STATICS_STORAGE
 from .validate_models import UserLoginItem, UserAddedItem
 
 user_api = APIRouter()
@@ -26,8 +30,9 @@ async def user_login(user_data: UserLoginItem = Body(...)):
     # 查询用户及密码
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,fixed_code,phone,password,access,is_active FROM user_user WHERE phone=%s OR fixed_code=%s;",
-            (user_data.username, user_data.username)
+            "SELECT id,fixed_code,phone,password,access,is_active FROM user_user "
+            "WHERE phone=%s OR fixed_code=%s OR username=%s;",
+            (user_data.username, user_data.username, user_data.username)
         )
         user = cursor.fetchone()
     if not user:
@@ -39,7 +44,6 @@ async def user_login(user_data: UserLoginItem = Body(...)):
         raise HTTPException(status_code=401, detail='用户名或密码错误!')
     # 生成token
     access = user['access'].split('-') if user['access'] else []
-    print('access:', access)
     user_token = generate_user_token({'user_id': user['id'], 'access': access})
     return {'message': '登录成功!', 'token': user_token}
 
@@ -53,7 +57,7 @@ async def user_information(token: str = Query(...)):
     # 查询用户信息
     with DBWorker() as (_, cursor):
         cursor.execute(
-            "SELECT id,username,access FROM user_user WHERE id=%s AND is_active=1;",
+            "SELECT id,username,avatar,access FROM user_user WHERE id=%s AND is_active=1;",
             (user_id, )
         )
         user = cursor.fetchone()
@@ -62,8 +66,9 @@ async def user_information(token: str = Query(...)):
         cursor.execute("UPDATE user_user SET update_time=%s WHERE id=%s;", (timestamp_now, user_id))
     if not user:
         raise HTTPException(status_code=401, detail='用户无效!')
+    avatar = '{}static/{}'.format(APP_HOST, user['avatar']) if user['avatar'] else '{}static/user_avatar.png'.format(APP_HOST)
     return {
-        'avatar': '{}static/user_avatar.png'.format(APP_HOST),
+        'avatar': avatar,
         'name': user['username'],
         'user_id': user_id,
         'access': user['access'].split('-')
@@ -137,6 +142,31 @@ async def set_user_access(user_id: int = Body(..., embed=True),
             ('-'.join(user_access), user_id)
         )
     return {'message': '设置成功!'}
+
+
+@user_api.post('/avatar/')  # 用户设置头像
+async def user_set_avatar(avatar_file: UploadFile = Form(...), user_token: str = Form(...)):
+    # 解析用户
+    user_id, _ = decipher_user_token(user_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='登录过期了!请重新登录!')
+    # 读取头像图片文件
+    save_path, sql_path = get_file_paths('Avatars', user_id, avatar_file.filename, folder_root='User', hashed=True)
+    # 保存文件并更新数据库
+    file_content = await avatar_file.read()
+    with open(save_path, 'wb') as fp:
+        fp.write(file_content)
+    await avatar_file.close()
+    with DBWorker() as (_, cursor):
+        # 查询历史头像路径
+        cursor.execute("SELECT id,avatar FROM user_user WHERE id=%s;", (user_id, ))
+        user_obj = cursor.fetchone()
+        cursor.execute("UPDATE user_user SET avatar=%s WHERE id=%s;", (sql_path, user_id))
+        if user_obj:
+            old_avatar = os.path.join(STATICS_STORAGE, user_obj['avatar'])
+            if os.path.exists(old_avatar) and os.path.isfile(old_avatar):
+                os.remove(old_avatar)
+    return {'message': '修改成功!', 'avatar_url': '{}static/{}'.format(APP_HOST, sql_path)}
 
 
 @user_api.get('/message/count/')  # 用户的未读消息数

@@ -10,6 +10,7 @@ import numpy as np
 import datetime
 import random
 import string
+from hashlib import md5
 from settings import STATICS_STORAGE
 
 
@@ -33,20 +34,22 @@ def generate_unique_filename(file_folder, filename, suffix):
 
 
 # 生成文件保存的绝对路径和SQL路径
-def get_file_paths(module_name, user_id, filename):
+def get_file_paths(module_name, user_id, filename, folder_root='Annexes', hashed=False):
     # 保存附件到指定文件夹
     date_folder = datetime.datetime.today().strftime('%Y%m')
     # 创建文件保存所在的路径
-    save_folder = "Annexes/{}/{}/{}/".format(module_name, user_id, date_folder)
+    save_folder = "{}/{}/{}/{}/".format(folder_root, module_name, user_id, date_folder)
     abs_folder = os.path.join(STATICS_STORAGE, save_folder)
     if not os.path.exists(abs_folder):
         os.makedirs(abs_folder)
     pre_filename, file_suffix = os.path.splitext(filename)
     # 检测文件绝对路径名称是否存在,存在则需生成新的文件名，否则文件会被覆盖而使数据错误
     save_folder, new_filename, suffix = generate_unique_filename(save_folder, pre_filename, file_suffix)
-    print('save_folder:', save_folder)
-    print('new_filename:', new_filename)
-    print('suffix:', suffix)
+    # print('save_folder:', save_folder)
+    # print('new_filename:', new_filename)
+    # print('suffix:', suffix)
+    if hashed:
+        new_filename = md5(new_filename.encode('utf8')).hexdigest()
     filename_saved = "{}{}".format(new_filename, suffix)
     save_path = os.path.join(abs_folder, filename_saved)
     sql_path = os.path.join(save_folder, filename_saved)
