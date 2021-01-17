@@ -33,3 +33,17 @@ def get_month_range(query_date: str):
     start_timestamp = int(query_date.timestamp())
     end_timestamp = int(end_date.timestamp())
     return start_timestamp, end_timestamp
+
+
+def get_current_year(swap_month=1, swap_day=28):
+    # 获取日期范围(swap_month月swap_day日(含)之后就显示新一年的)
+    today = datetime.datetime.today()
+    year = today.year
+    month = today.month
+    day = today.day
+    if month == swap_month and day < swap_day:
+        # 显示去年的数据
+        current_year = '{}-01-01'.format(year - 1)
+    else:
+        current_year = '{}-01-01'.format(year)
+    return current_year

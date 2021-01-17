@@ -58,6 +58,7 @@ def handle_customer_amount_revenue(customer_df, revenue_df):
         # 直接添加每个客户的留存，利息，权益都为空
         customer_df['sum_remain'] = [0 for _ in range(row_count)]
         customer_df['sum_interest'] = [0 for _ in range(row_count)]
+        customer_df['sum_income'] = [0 for _ in range(row_count)]
         customer_df['crights'] = [0 for _ in range(row_count)]
         customer_df['create_time'] = ['' for _ in range(row_count)]
         result_df = customer_df
@@ -65,8 +66,8 @@ def handle_customer_amount_revenue(customer_df, revenue_df):
         # 处理留存和利息权益的问题：留存和利息以客户为主累计加和，权益取create_time最大的一条
         sum_revenue_df = revenue_df.groupby(by=['customer_id'], as_index=False)[['remain', 'interest']].sum()
         sum_revenue_df = sum_revenue_df.reset_index()
-        sum_revenue_df = sum_revenue_df.rename(columns={'remain': 'sum_remain', 'interest': 'sum_interest'})
-        # 这是留存和利息的加和数据
+        sum_revenue_df = sum_revenue_df.rename(columns={'remain': 'sum_remain', 'interest': 'sum_interest'})  # 这是留存和利息的加和数据
+        sum_revenue_df['sum_income'] = sum_revenue_df['sum_remain'] + sum_revenue_df['sum_interest']
         # 排序后分组取第一条
         rights_df = revenue_df.sort_values('create_time', ascending=False).groupby(by=['customer_id'], as_index=False).first()
         rights_df = rights_df[['create_time', 'customer_id', 'author_id', 'crights']]  # 取需要的列
@@ -79,7 +80,6 @@ def handle_customer_amount_revenue(customer_df, revenue_df):
         result_df = pd.merge(customer_df, result_revenue_df, on=['customer_id', 'author_id'], how='left')
         # 填0
         result_df.fillna(0, inplace=True)
-
     # 最后转客户的创建日期格式
     result_df['customer_create'] = result_df['customer_create'].apply(
         lambda x: datetime.datetime.fromtimestamp(x).strftime('%Y-%m-%d'))
@@ -88,8 +88,7 @@ def handle_customer_amount_revenue(customer_df, revenue_df):
         {'total_count': 'count'})
     # 2 计算各人员的客户所有权益和
     sum_revenue_df = result_df.groupby(by=['author_id', 'username'], as_index=False)[
-        ['sum_remain', 'sum_interest', 'crights']].sum()
-
+        ['sum_remain', 'sum_interest', 'sum_income', 'crights']].sum()
     # 合并数量和权益和的数据框
     result_data_df = pd.merge(amount_count_df, sum_revenue_df, on=['author_id', 'username'], how='inner')
     return result_data_df.to_dict(orient='records')
@@ -113,6 +112,23 @@ def handle_customer_amount_revenue(customer_df, revenue_df):
     # return result_df.to_dict(orient='records')
 
 
+# def handle_customer_revenue_monthly(customer_df, revenue_df, s_type):
+#     if customer_df.empty:
+#         return []
+#     if s_type == 'month':
+#         timestamp_format = '%Y-%m-%d'
+#     elif s_type == 'year':
+#         timestamp_format = '%Y-%m'
+#     else:
+#         return []
+#     # 处理日期
+#     customer_df['create_time'] = customer_df['create_time'].apply(
+#         lambda x: datetime.datetime.fromtimestamp(x).strftime(timestamp_format))
+#     revenue_df['create_time'] = revenue_df['create_time'].apply(
+#         lambda x: datetime.datetime.fromtimestamp(x).strftime(timestamp_format))
+#     # 以人员日期格式进行分组计算客户量
+#
+#
 
 
 

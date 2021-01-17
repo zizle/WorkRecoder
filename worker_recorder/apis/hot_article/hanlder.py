@@ -61,7 +61,10 @@ def handle_article_amount(article_df, s_type):
         user_data = {'author_id': int(name[0]), 'username': str(name[1])}
         group_df = group.set_index('create_time').reset_index()  # 得到日期对应的作者的数量
         group_data = group_df.to_dict(orient='records')
+        each_total = 0
         for item in group_data:
+            each_total += item['count']
             user_data[item['create_time']] = item['count']
+        user_data['year_total'] = each_total
         result.append(user_data)
     return result
