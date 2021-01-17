@@ -28,7 +28,7 @@ def create_abnormal_table():
             "`allowance` DECIMAL(15,6) NOT NULL DEFAULT 0 COMMENT '收入补贴',"
             "`partner` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '合作者',"
             "`note` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '备注',"
-            "`score` INT NOT NULL DEFAULT 1 COMMENT '评级得分',"
+            "`score` INT NOT NULL DEFAULT 0 COMMENT '评级得分',"
             "`annex` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '附件',"
             "`annex_url` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '附件URL',"
             "`is_examined` BIT NOT NULL DEFAULT 1 COMMENT '审核状态',"

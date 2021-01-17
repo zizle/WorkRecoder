@@ -20,7 +20,6 @@ class AbnormalWorkAddItem(BaseModel):
     swiss_coin: int
     allowance: float
     partner: str
-    score: int
     note: str
 
     @validator('create_time')
@@ -55,6 +54,13 @@ class AbnormalModifyBodyItem(BaseModel):
     partner: str
     score: int
     note: str
+
+
+class AuditAbnormalItem(BaseModel):
+    user_token: str
+    abnormal_id: int
+    score: int
+    is_examined: int
 
 
 def get_abnormal_content_item(body_data: str = Form(...)):
