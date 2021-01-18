@@ -16,9 +16,8 @@ def validate_operate_user(user_token, audit=None):
     # 判断是否为管理页获取
     is_audit = 0
     if audit:
-        if 'admin' not in access and audit not in access:
-            raise HTTPException(status_code=403, detail='不能这样操作!')
-        is_audit = 1
+        if 'admin' in access or audit in access:
+            is_audit = 1
     return user_id, is_audit
 
 
