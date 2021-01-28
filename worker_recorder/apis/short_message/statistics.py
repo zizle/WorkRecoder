@@ -79,7 +79,7 @@ async def get_user_year_total(user_token: str = Query(...)):
     message = get_messages(start_timestamp, end_timestamp, 0)
     message_df = pd.DataFrame(message)
     if message_df.empty:
-        return {'message': '统计成功!', 'total_count': 0, 'percent': '-'}
+        return {'message': '统计成功!', 'total_count': 0, 'percent': 0, 'month_count': []}
     total_count = message_df.shape[0]
     if 'admin' in access:
         detail_count_data = handle_detail_amount(message_df, 'year')
