@@ -63,9 +63,4 @@ async def get_user_year_total(user_token: str = Query(...)):
         detail_count_data = handle_onduty_message_point_amount(user_record_df, 'year')
         user_count = user_record_df.shape[0]
         percent = round(user_count / total_count * 100, 2) if total_count else 0
-    print(11111111111111111111)
-    print(11111111111111111111)
-    print(11111111111111111111)
-    print(11111111111111111111)
-    print(11111111111111111111)
     return {'message': '统计成功!', 'total_count': user_count, 'percent': percent, 'month_count': detail_count_data}

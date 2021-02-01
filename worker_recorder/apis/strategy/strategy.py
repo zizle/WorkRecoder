@@ -39,7 +39,7 @@ async def add_strategy(strategy_item: StrategyAddItem = Body(...)):
         raise HTTPException(status_code=401, detail='登录已过期,请重新登录!')
     now_timestamp = int(datetime.datetime.now().timestamp())
     strategy_add = jsonable_encoder(strategy_item)
-    strategy_add['create_time'] = now_timestamp
+    strategy_add['create_time'] = int(datetime.datetime.strptime(strategy_item.create_time, '%Y-%m-%d').timestamp())
     strategy_add['join_time'] = now_timestamp
     strategy_add['update_time'] = now_timestamp
     strategy_add['author_id'] = user_id
