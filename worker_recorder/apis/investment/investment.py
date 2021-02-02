@@ -65,9 +65,9 @@ async def add_investment(annex_file: UploadFile = Form(None),
         count = cursor.execute(
             "INSERT INTO work_investment (create_time,join_time,update_time,author_id,title,variety_en,contract,"
             "direction,build_price,out_price,build_hands,cutloss_price,expire_time,profit,note,annex,annex_url,"
-            "is_publish) VALUES (%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(title)s,"
+            "is_publish,is_running) VALUES (%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(title)s,"
             "%(variety_en)s,%(contract)s,%(direction)s,%(build_price)s,%(out_price)s,%(build_hands)s,%(cutloss_price)s,"
-            "%(expire_time)s,%(profit)s,%(note)s,%(annex)s,%(annex_url)s,%(is_publish)s);",
+            "%(expire_time)s,%(profit)s,%(note)s,%(annex)s,%(annex_url)s,%(is_publish)s,%(is_running)s);",
             body_content
         )
         if count < 1 and save_path and os.path.exists(save_path) and os.path.isfile(save_path):
@@ -127,7 +127,8 @@ async def modify_investment(investment_id: int,
             body_content['annex'] = annex_file.filename
             body_content['annex_url'] = sql_path
             cursor.execute(
-                "UPDATE work_investment SET out_price=%(out_price)s,cutloss_price=%(cutloss_price)s,"
+                "UPDATE work_investment SET build_price=%(build_price)s,build_hands=%(build_hands)s,"
+                "out_price=%(out_price)s,cutloss_price=%(cutloss_price)s,"
                 "profit=%(profit)s,is_running=%(is_running)s,score=%(score)s,note=%(note)s,"
                 "annex=%(annex)s,annex_url=%(annex_url)s "
                 "WHERE id=%(investment_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
@@ -144,7 +145,8 @@ async def modify_investment(investment_id: int,
         # 没有附件,只更新其他字段
         else:
             cursor.execute(
-                "UPDATE work_investment SET out_price=%(out_price)s,cutloss_price=%(cutloss_price)s,"
+                "UPDATE work_investment SET build_price=%(build_price)s,build_hands=%(build_hands)s,"
+                "out_price=%(out_price)s,cutloss_price=%(cutloss_price)s,"
                 "profit=%(profit)s,is_running=%(is_running)s,score=%(score)s,note=%(note)s "
                 "WHERE id=%(investment_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s) "
                 "LIMIT 1;",

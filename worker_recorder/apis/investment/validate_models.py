@@ -59,6 +59,8 @@ class QueryInvestmentItem(BaseModel):
 class InvestmentModifyBodyItem(BaseModel):
     user_token: str
     investment_id: int
+    build_price: float
+    build_hands: int
     out_price: float
     cutloss_price: float
     profit: float
