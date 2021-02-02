@@ -1,7 +1,7 @@
 # _*_ coding:utf-8 _*_
 
-
 # 用户的API
+# 用户的身份情况access见settings.py
 
 # 1. 用户使用账号密码登录
 # 2. 用户使用token登录
@@ -81,21 +81,39 @@ async def user_list(token: str = Query(...)):
     user_id, access = decipher_user_token(token)
     if user_id is None or access is None:
         raise HTTPException(status_code=401, detail='登录已过期!')
-    if 'admin' not in access:
-        return {'message': '获取用户列表成功!', 'users': []}
+
     # 查询用户列表
     with DBWorker() as (_, cursor):
+        # 查询请求用户的organization
+        cursor.execute("SELECT id,organization,access FROM user_user WHERE id=%s;", (user_id, ))
+        req_user = cursor.fetchone()
+        if not req_user:
+            raise HTTPException(status_code=401, detail='用户不存在!')
+        req_organization = req_user['organization']
+        req_access = req_user['access'].split('-')
         cursor.execute(
             "SELECT id,username,fixed_code,join_time,update_time,phone,email,access,is_active,organization "
             "FROM user_user WHERE id>1;"
         )
         users = cursor.fetchall()
-    for user_item in users:
+    resp_users = []  # 普通用户返回空
+    # 管理员返回所有的用户
+    if 'admin' in req_access:
+        resp_users = users
+    # 组长返回组员
+    elif 'leader' in req_access:
+        for user_item in users:
+            if user_item['organization'] == req_organization:
+                resp_users.append(user_item)
+    else:
+        pass
+    for user_item in resp_users:
         user_item['join_time'] = datetime.datetime.fromtimestamp(user_item['join_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['update_time'] = datetime.datetime.fromtimestamp(user_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['organization_name'] = ORGANIZATIONS.get(user_item['organization'], '未知')
         user_item['access'] = user_item['access'].split('-')
-    return {'message': '获取用户列表成功!', 'users': users}
+        user_item['is_leader'] = 1 if 'leader' in user_item['access'] else 0
+    return {'message': '获取用户列表成功!', 'users': resp_users}
 
 
 @user_api.post('/add/')  # 添加一个用户

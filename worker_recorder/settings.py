@@ -11,6 +11,8 @@ import platform
 4. 非常规工作(abnormal):   abnormal_work
 5. 收入指标(income_point): revenue
 6. 热点文章(hot_article):  article
+7. 组长身份的字符串:        leader
+8. 管理员身份的字符串:       admin
 """
 
 
