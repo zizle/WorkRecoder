@@ -67,7 +67,6 @@ def query_work_records(ts_start: int, ts_end: int, table_name: str, columns: str
     query ="SELECT u.username,t.author_id,{} FROM {} AS t " \
            "INNER JOIN user_user AS u ON u.id=t.author_id " \
            "WHERE t.create_time>=%s AND t.create_time<=%s;".format(columns, table_name)
-    print(query)
     with DBWorker() as (_, cursor):
         cursor.execute(
             query, (ts_start, ts_end)
@@ -76,14 +75,18 @@ def query_work_records(ts_start: int, ts_end: int, table_name: str, columns: str
     return records
 
 
-def filter_exclude_user_record(records: list, include_ids: list):
+def filter_exclude_record(records: list, include_ids: list, include_kw: str, kw_column: str):
     """
     过滤掉指定用户外的数据
     :param records: 记录条目
     :param include_ids: 要的作者id列表
+    :param include_kw: 包含的关键字
+    :param kw_column: 在哪列查找包含的关键词
     :return: 过滤后的数据
     """
     data_frame = pd.DataFrame(records)
     data_frame = data_frame[data_frame['author_id'].isin(include_ids)]
+    if include_kw:
+        data_frame = data_frame[data_frame[kw_column].str.contains(include_kw, regex=False)]
     return data_frame.to_dict(orient='records')
 

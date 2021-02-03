@@ -12,7 +12,7 @@ from utils.time_handler import get_month_range, get_year_range, get_current_year
 from utils.encryption import decipher_user_token
 from .hanlder import get_abnormal_work, handle_abnormal_amount_score, handle_abnormal_work_amount
 from apis.utils import validate_start_date, validate_end_date
-from apis.tools import query_work_records, filter_exclude_user_record
+from apis.tools import query_work_records, filter_exclude_record
 
 
 statistics_api = APIRouter()
@@ -94,12 +94,14 @@ def statistics_records(records):  # 进行记录的统计(以用户分组统计�
 @statistics_api.get('/')  # 按年统计请求用户id中的非常规工作数量
 async def statistics_users_count(currency: str = Query(...),
                                  start_ts: int = Depends(validate_start_date),
-                                 end_ts: int = Depends(validate_end_date)):
+                                 end_ts: int = Depends(validate_end_date),
+                                 kw: str = Query(None)):
     """
 
     :param currency: 包含的所有id的字符串
     :param start_ts: 日期开始的时间戳
     :param end_ts: 日期结束的时间戳
+    :param kw: 关键词查询
     :return: 响应数据
     """
     # currency: 要查询的用户ids字符串以`,`分割
@@ -109,8 +111,8 @@ async def statistics_users_count(currency: str = Query(...),
                     't.partner,t.note,t.score,t.annex,t.annex_url,t.is_examined'
     records = query_work_records(ts_start=start_ts, ts_end=end_ts,
                                  table_name='work_abnormal', columns=query_columns)
-    # 记录以作者过滤
-    records = filter_exclude_user_record(records, include_ids)
+    # 记录以作者过滤和关键词过滤
+    records = filter_exclude_record(records, include_ids, include_kw=kw, kw_column='title')
     # 进行统计
     records, statistics = statistics_records(records)
 
