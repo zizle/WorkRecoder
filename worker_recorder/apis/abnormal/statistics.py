@@ -7,10 +7,13 @@
 
 import datetime
 import pandas as pd
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from utils.time_handler import get_month_range, get_year_range, get_current_year
 from utils.encryption import decipher_user_token
 from .hanlder import get_abnormal_work, handle_abnormal_amount_score, handle_abnormal_work_amount
+from apis.utils import validate_start_date, validate_end_date
+from apis.tools import query_work_records, filter_exclude_record
+
 
 statistics_api = APIRouter()
 
@@ -64,3 +67,53 @@ async def get_user_year_total(user_token: str = Query(...)):
         user_count = user_record_df.shape[0]
         percent = round(user_count / total_count * 100, 2) if total_count else 0
     return {'message': '统计成功!', 'total_count': user_count, 'percent': percent, 'month_count': detail_count_data}
+
+
+""" 2021.02.03 """
+
+
+def statistics_records(records):  # 进行记录的统计(以用户分组统计数量、瑞币、收入补贴、评级得分)
+    record_df = pd.DataFrame(records)
+    # 过滤掉审核没通过的数据条目
+    if record_df.empty:
+        return [], []
+    # 只统计有效的工作记录
+    record_df = record_df[record_df['is_examined'] == 1]
+    if record_df.empty:
+        return [], []
+    # 计算各人员的策略数量
+    amount_count_df = record_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+        {'total_count': 'count'})
+    # 统计其他字段
+    sum_df = record_df.groupby(by=['author_id'], as_index=False)[['swiss_coin', 'allowance', 'score']].sum()
+    # 将数据合并
+    sum_df = pd.merge(amount_count_df, sum_df, on=['author_id'], how='left')
+    return record_df.to_dict(orient='records'), sum_df.to_dict(orient='records')
+
+
+@statistics_api.get('/')  # 按年统计请求用户id中的非常规工作数量
+async def statistics_users_count(currency: str = Query(...),
+                                 start_ts: int = Depends(validate_start_date),
+                                 end_ts: int = Depends(validate_end_date),
+                                 kw: str = Query(None)):
+    """
+
+    :param currency: 包含的所有id的字符串
+    :param start_ts: 日期开始的时间戳
+    :param end_ts: 日期结束的时间戳
+    :param kw: 关键词查询
+    :return: 响应数据
+    """
+    # currency: 要查询的用户ids字符串以`,`分割
+    include_ids = list(map(int, currency.split(',')))
+    # 进行数据获取
+    query_columns = 't.id,t.create_time,t.title,t.task_type,t.sponsor,t.applicant,t.phone,t.swiss_coin,t.allowance,' \
+                    't.partner,t.note,t.score,t.annex,t.annex_url,t.is_examined'
+    records = query_work_records(ts_start=start_ts, ts_end=end_ts,
+                                 table_name='work_abnormal', columns=query_columns)
+    # 记录以作者过滤和关键词过滤
+    records = filter_exclude_record(records, include_ids, include_kw=kw, kw_column='title')
+    # 进行统计
+    records, statistics = statistics_records(records)
+
+    return {'message': '获取数据成功!', 'records': records, 'statistics': statistics}

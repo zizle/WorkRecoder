@@ -105,8 +105,9 @@ async def user_list(token: str = Query(...)):
         for user_item in users:
             if user_item['organization'] == req_organization:
                 resp_users.append(user_item)
+    # 普通用户返回自己
     else:
-        pass
+        resp_users.append(user_id)
     for user_item in resp_users:
         user_item['join_time'] = datetime.datetime.fromtimestamp(user_item['join_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['update_time'] = datetime.datetime.fromtimestamp(user_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
