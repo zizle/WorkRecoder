@@ -5,7 +5,7 @@
 # 2. 获取品种列表
 import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from db import DBWorker
 from utils.constants import VARIETY_GROUPS, EXCHANGES
 
@@ -26,7 +26,6 @@ async def get_all_variety():
         v_item['update_time'] = datetime.datetime.fromtimestamp(v_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')
         v_item['group_name'] = VARIETY_GROUPS.get(v_item['group_id'], '未知')
         v_item['exchange_name'] = VARIETY_GROUPS.get(v_item['exchange_id'], '未知')
-
     return {'message': '获取品种成功!', 'varieties': varieties}
 
 

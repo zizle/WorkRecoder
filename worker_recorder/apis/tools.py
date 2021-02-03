@@ -4,8 +4,10 @@
 # @Author: zizle
 
 import datetime
+import pandas as pd
 from fastapi import HTTPException
 from utils.encryption import decipher_user_token
+from db import DBWorker
 
 
 # 验证用户
@@ -48,3 +50,40 @@ def filter_records(
     if total_records:
         total_records = list(filter(lambda x: keyword in x[key_column], total_records))
     return records, total_records
+
+
+""" 2021.02.03 """
+
+
+def query_work_records(ts_start: int, ts_end: int, table_name: str, columns: str):
+    """
+    查询指定时间戳范围内的指定数据表的数据
+    :param ts_start: 日期起始时间戳
+    :param ts_end: 日期结束时间戳
+    :param table_name: 查询的工作记录表名称
+    :param columns: 查询的字段
+    :return: records-记录条目list
+    """
+    query ="SELECT u.username,t.author_id,{} FROM {} AS t " \
+           "INNER JOIN user_user AS u ON u.id=t.author_id " \
+           "WHERE t.create_time>=%s AND t.create_time<=%s;".format(columns, table_name)
+    print(query)
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            query, (ts_start, ts_end)
+        )
+        records = cursor.fetchall()
+    return records
+
+
+def filter_exclude_user_record(records: list, include_ids: list):
+    """
+    过滤掉指定用户外的数据
+    :param records: 记录条目
+    :param include_ids: 要的作者id列表
+    :return: 过滤后的数据
+    """
+    data_frame = pd.DataFrame(records)
+    data_frame = data_frame[data_frame['author_id'].isin(include_ids)]
+    return data_frame.to_dict(orient='records')
+
