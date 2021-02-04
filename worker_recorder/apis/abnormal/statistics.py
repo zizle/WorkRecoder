@@ -118,6 +118,8 @@ async def statistics_users_count(currency: str = Query(...),
                     't.partner,t.note,t.score,t.annex,t.annex_url,t.is_examined'
     records = query_work_records(ts_start=start_ts, ts_end=end_ts,
                                  table_name='work_abnormal', columns=query_columns)
+    if not records:
+        return {'message': '获取数据成功!', 'records': [], 'statistics': []}
     # 记录以作者过滤和关键词过滤
     records = filter_exclude_record(records, include_ids, include_kw=kw, kw_column='title')
     # 进行统计

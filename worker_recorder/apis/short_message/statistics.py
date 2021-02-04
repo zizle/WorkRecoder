@@ -12,12 +12,13 @@
 
 import datetime
 import pandas as pd
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 
 from utils.encryption import decipher_user_token
 from utils.time_handler import get_year_range, get_month_range, get_current_year
 from .handler import get_messages, handle_detail_amount, handle_amount_audit_rank
-
+from apis.utils import validate_start_date, validate_end_date
+from apis.tools import query_work_records, filter_exclude_record
 statistics_api = APIRouter()
 
 
@@ -92,3 +93,58 @@ async def get_user_year_total(user_token: str = Query(...)):
         user_count = user_message_df.shape[0]
         percent = round(user_count / total_count * 100, 2) if total_count else 0
     return {'message': '统计成功!', 'total_count': user_count, 'percent': percent, 'month_count': detail_count_data}
+
+
+""" 2021.02.04 """
+
+
+def statistics_records(records):  # 对记录集进行统计(数量、标记数)
+    record_df = pd.DataFrame(records)
+    if record_df.empty:
+        return [], []
+    # 以作者分组数据统计数量
+    record_count_df = record_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+        {'total_count': 'count'})
+    # 对标记数量进行统计
+    message_audit_df = record_df[~(record_df['audit_mind'] == 0)]  # 筛选出audit_mind != 0的
+    # 对此进行分组统计
+    audit_count_df = message_audit_df.groupby(['author_id'], as_index=False)['author_id'].agg(
+        {'audit_count': 'count'})
+    # 合并两个数据框,并补0
+    result_df = pd.merge(record_count_df, audit_count_df, on=['author_id'], how='left')
+    result_df.fillna(0, inplace=True)
+    return record_df.to_dict(orient='records'), result_df.to_dict(orient='records')
+
+
+def columns_handler(item):  # 处理数据记录字段值
+    item['create_time'] = datetime.datetime.fromtimestamp(item['create_time']).strftime('%Y-%m-%d')
+    return item
+
+
+@statistics_api.get('/')  # 获取所有在请求id中的短讯通数据并统计
+async def statistics_users_short_message(currency: str = Query(...),
+                                         start_ts: int = Depends(validate_start_date),
+                                         end_ts: int = Depends(validate_end_date),
+                                         kw: str = Query(None)):
+    """
+    根据参数获取到记录并进行需求统计
+    :param currency: 要请求的用户id字符串
+    :param start_ts: 日期开始时间戳
+    :param end_ts: 日期结束的时间戳
+    :param kw: 关键词查询
+    :return: 响应数据
+    """
+    include_ids = list(map(int, currency.split(',')))
+    # 进行数据获取
+    query_columns = 't.id,t.create_time,t.content,t.msg_type,t.effects,t.note,t.audit_mind'
+    records = query_work_records(ts_start=start_ts, ts_end=end_ts,
+                                 table_name='work_short_message', columns=query_columns)
+    if not records:
+        return {'message': '获取数据成功!', 'records': [], 'statistics': []}
+    # 记录以作者过滤和关键词过滤
+    records = filter_exclude_record(records, include_ids, include_kw=kw, kw_column='content')
+    # # 进行统计
+    records, statistics = statistics_records(records)
+    # # 处理字段值
+    records = list(map(columns_handler, records))
+    return {'message': '获取数据成功!', 'records': records, 'statistics': statistics}
