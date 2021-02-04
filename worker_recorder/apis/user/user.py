@@ -85,7 +85,8 @@ async def user_list(token: str = Query(...)):
     # 查询用户列表
     with DBWorker() as (_, cursor):
         # 查询请求用户的organization
-        cursor.execute("SELECT id,organization,access FROM user_user WHERE id=%s;", (user_id, ))
+        cursor.execute("SELECT id,username,fixed_code,join_time,update_time,phone,email,access,is_active,organization "
+                       "FROM user_user WHERE id=%s;", (user_id, ))
         req_user = cursor.fetchone()
         if not req_user:
             raise HTTPException(status_code=401, detail='用户不存在!')
@@ -107,7 +108,7 @@ async def user_list(token: str = Query(...)):
                 resp_users.append(user_item)
     # 普通用户返回自己
     else:
-        resp_users.append(user_id)
+        resp_users.append(req_user)
     for user_item in resp_users:
         user_item['join_time'] = datetime.datetime.fromtimestamp(user_item['join_time']).strftime('%Y-%m-%d %H:%M:%S')
         user_item['update_time'] = datetime.datetime.fromtimestamp(user_item['update_time']).strftime('%Y-%m-%d %H:%M:%S')

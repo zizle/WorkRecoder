@@ -54,6 +54,7 @@ class AbnormalModifyBodyItem(BaseModel):
     partner: str
     score: int
     note: str
+    allowance: int
 
 
 class AuditAbnormalItem(BaseModel):

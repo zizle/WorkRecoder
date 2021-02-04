@@ -13,6 +13,7 @@ from utils.encryption import decipher_user_token
 from .hanlder import get_abnormal_work, handle_abnormal_amount_score, handle_abnormal_work_amount
 from apis.utils import validate_start_date, validate_end_date
 from apis.tools import query_work_records, filter_exclude_record
+from settings import APP_HOST
 
 
 statistics_api = APIRouter()
@@ -91,6 +92,12 @@ def statistics_records(records):  # 进行记录的统计(以用户分组统计�
     return record_df.to_dict(orient='records'), sum_df.to_dict(orient='records')
 
 
+def columns_handler(item):
+    item['create_time'] = datetime.datetime.fromtimestamp(item['create_time']).strftime('%Y-%m-%d')
+    item['annex_url'] = APP_HOST + 'static/' + item['annex_url']
+    return item
+
+
 @statistics_api.get('/')  # 按年统计请求用户id中的非常规工作数量
 async def statistics_users_count(currency: str = Query(...),
                                  start_ts: int = Depends(validate_start_date),
@@ -115,5 +122,6 @@ async def statistics_users_count(currency: str = Query(...),
     records = filter_exclude_record(records, include_ids, include_kw=kw, kw_column='title')
     # 进行统计
     records, statistics = statistics_records(records)
-
+    # 处理字段值
+    records = list(map(columns_handler, records))
     return {'message': '获取数据成功!', 'records': records, 'statistics': statistics}
