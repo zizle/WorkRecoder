@@ -120,7 +120,7 @@ async def modify_investment(abnormal_id: int,
             body_content['annex_url'] = sql_path
             cursor.execute(
                 "UPDATE work_abnormal SET title=%(title)s,sponsor=%(sponsor)s,applicant=%(applicant)s,"
-                "phone=%(phone)s,swiss_coin=%(swiss_coin)s,partner=%(partner)s,score=%(score)s,"
+                "allowance=%(allowance)s,phone=%(phone)s,swiss_coin=%(swiss_coin)s,partner=%(partner)s,score=%(score)s,"
                 "note=%(note)s,annex=%(annex)s,annex_url=%(annex_url)s "
                 "WHERE id=%(abnormal_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
                 " LIMIT 1;",
@@ -137,7 +137,7 @@ async def modify_investment(abnormal_id: int,
         else:
             cursor.execute(
                 "UPDATE work_abnormal SET title=%(title)s,sponsor=%(sponsor)s,applicant=%(applicant)s,"
-                "phone=%(phone)s,swiss_coin=%(swiss_coin)s,partner=%(partner)s,score=%(score)s,"
+                "allowance=%(allowance)s,phone=%(phone)s,swiss_coin=%(swiss_coin)s,partner=%(partner)s,score=%(score)s,"
                 "note=%(note)s "
                 "WHERE id=%(abnormal_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
                 " LIMIT 1;",
