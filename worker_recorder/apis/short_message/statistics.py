@@ -16,9 +16,12 @@ from fastapi import APIRouter, Query, HTTPException, Depends
 
 from utils.encryption import decipher_user_token
 from utils.time_handler import get_year_range, get_month_range, get_current_year
+from utils.constants import MSG_AUDIT_MIND
 from .handler import get_messages, handle_detail_amount, handle_amount_audit_rank
 from apis.utils import validate_start_date, validate_end_date
 from apis.tools import query_work_records, filter_exclude_record
+
+
 statistics_api = APIRouter()
 
 
@@ -118,6 +121,7 @@ def statistics_records(records):  # 对记录集进行统计(数量、标记数)
 
 def columns_handler(item):  # 处理数据记录字段值
     item['create_time'] = datetime.datetime.fromtimestamp(item['create_time']).strftime('%Y-%m-%d')
+    item['audit_description'] = '标记意见：{}'.format(MSG_AUDIT_MIND.get(item['audit_mind'], '无'))
     return item
 
 

@@ -10,11 +10,14 @@
 
 import datetime
 import pandas as pd
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 
 from utils.time_handler import get_month_range, get_year_range, get_current_year
 from utils.encryption import decipher_user_token
+from utils.constants import VARIETY_CN
 from .handler import get_strategy, handle_strategy_amount_rate, handle_strategy_amount
+from apis.utils import validate_start_date, validate_end_date
+from apis.tools import query_work_records, filter_exclude_record, filter_records
 
 statistics_api = APIRouter()
 
@@ -68,3 +71,83 @@ async def get_user_year_total(user_token: str = Query(...)):
         user_count = user_record_df.shape[0]
         percent = round(user_count / total_count * 100, 2) if total_count else 0
     return {'message': '统计成功!', 'total_count': user_count, 'percent': percent, 'month_count': detail_count_data}
+
+
+""" 2021.02.18 """
+
+
+def statistics_records(records):  # 对记录集进行统计(数量、标记数)
+    record_df = pd.DataFrame(records)
+    if record_df.empty:
+        return [], []
+    # 去除运行中的策略得到要统计的策略
+    statistics_df = record_df[record_df['is_running'] == 0]
+    if statistics_df.empty:
+        return record_df.to_dict(orient='records'), []
+    # 1 以作者分组数据统计数量
+    record_count_df = statistics_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+        {'total_count': 'count'})
+    # 2 筛选收益率>0的条目,统计成功率
+    success_df = statistics_df[statistics_df['profit'] > 0]
+    # 统计各人员的成功数量
+    success_count_df = success_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+        {'success_count': 'count'})
+    # **合并各人员策略数量与成功数量数据框
+    result_df = pd.merge(record_count_df, success_count_df, on=['author_id', 'username'], how='left')
+    # 3 计算算术平均收益率
+    # 计算每条策略的收益率
+    statistics_df['profit_rate'] = statistics_df['profit'] / 100000
+    # 分组合计每人的收益、收益率加和
+    avg_profit_df = statistics_df.groupby(by=['author_id', 'username'])[['profit', 'profit_rate']].sum()
+    avg_profit_df = avg_profit_df.reset_index()
+    avg_profit_df = avg_profit_df.rename(columns={'profit': 'sum_profit', 'profit_rate': 'sum_profit_rate'})
+
+    # **将数量数据框与平均收益数据框合并
+    result_df = pd.merge(result_df, avg_profit_df, on=['author_id', 'username'], how='left')
+    # 计算平均收益率
+    result_df['avg_profit_rate'] = result_df['sum_profit_rate'] / result_df['total_count']
+    # 删除收益率算术平均和的列避免混淆
+    # 4. 计算累计收益率（暂时认定就是所有记录的的收益和 / 10万 * 条数 = 每个记录的收益率加总）
+
+    # 5. 计算成功率
+    result_df['success_rate'] = result_df['success_count'] / result_df['total_count']
+
+    result_df.fillna(0, inplace=True)
+
+    return record_df.to_dict(orient='records'), result_df.to_dict(orient='records')
+
+
+def columns_handler(item):  # 处理数据记录字段值
+    item['create_time'] = datetime.datetime.fromtimestamp(item['create_time']).strftime('%Y-%m-%d')
+    item['contract_name'] = VARIETY_CN.get(item['variety_en'], '') + item['contract']
+    return item
+
+
+@statistics_api.get('/')  # 获取所有再请求id中的投顾策略数据并进行统计
+async def statistics_users_strategy(currency: str = Query(...),
+                                    start_ts: int = Depends(validate_start_date),
+                                    end_ts: int = Depends(validate_end_date),
+                                    kw: str = Query(None)):
+    """
+    根据参数获取到记录并进行需求统计
+    :param currency: 要请求的用户id字符串
+    :param start_ts: 日期开始时间戳
+    :param end_ts: 日期结束的时间戳
+    :param kw: 关键词查询
+    :return: 响应数据
+    """
+    include_ids = list(map(int, currency.split(',')))
+    # 进行数据获取
+    query_columns = 't.id,t.*'
+    records = query_work_records(ts_start=start_ts, ts_end=end_ts,
+                                 table_name='work_strategy', columns=query_columns)
+    if not records:
+        return {'message': '获取数据成功!', 'records': [], 'statistics': []}
+    # 记录以作者过滤和关键词过滤
+    records = filter_exclude_record(records, include_ids, include_kw=kw, kw_column='content')
+    # 进行统计
+    records, statistics = statistics_records(records)
+    # 处理字段值
+    records = list(map(columns_handler, records))
+    return {'message': '获取数据成功!', 'records': records, 'statistics': statistics}
+

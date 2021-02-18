@@ -99,22 +99,22 @@ async def query_strategy(query_item: QueryStrategyItem = Body(...)):
 
 @strategy_api.put('/modify/{strategy_id}/')
 async def modify_strategy_record(strategy_id: int, modify_item: ModifyStrategyItem = Body(...)):
-    user_id, is_audit = validate_operate_user(modify_item.user_token)
+    user_id, is_audit = validate_operate_user(modify_item.user_token, 'admin')
     # 修改数据
     update_timestamp = int(datetime.datetime.now().timestamp())
     with DBWorker() as (_, cursor):
         cursor.execute(
             "UPDATE work_strategy SET update_time=%s,open_price=%s,close_price=%s,profit=%s,note=%s,is_running=%s "
-            "WHERE id=%s AND author_id=%s;",
+            "WHERE id=%s AND IF(%s=1,TRUE,author_id=%s);",
             (update_timestamp, modify_item.open_price, modify_item.close_price, modify_item.profit, modify_item.note,
-             modify_item.is_running, strategy_id, user_id)
+             modify_item.is_running, strategy_id, is_audit,user_id)
         )
     return {'message': '修改成功!', 'strategy': modify_item}
 
 
 @strategy_api.delete('/remove/{strategy_id}/')  # 用户或管理者删除一条投顾策略记录
 async def delete_strategy_record(strategy_id: int, user_token: str = Query(...)):
-    user_id, is_audit = validate_operate_user(user_token)
+    user_id, is_audit = validate_operate_user(user_token, 'admin')
     # 删除数据
     with DBWorker() as (_, cursor):
         cursor.execute('SELECT id,author_id FROM work_strategy WHERE id=%s;', (strategy_id, ))
