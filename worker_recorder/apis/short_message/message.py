@@ -13,6 +13,7 @@ import datetime
 
 import pandas as pd
 from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Body
+from fastapi.encoders import jsonable_encoder
 
 from db import DBWorker
 from utils.encryption import decipher_user_token
@@ -20,7 +21,7 @@ from utils.file_hands import date_column_converter
 from utils.constants import MSG_AUDIT_MIND
 from apis.tools import validate_operate_user, validate_date_range, filter_records
 from logger import logger
-from .validate_models import AuditMessageItem, QueryMsgBodyItem, JoinTimeDelMsgItem
+from .validate_models import AuditMessageItem, QueryMsgBodyItem, JoinTimeDelMsgItem, AddMsgBodyItem
 
 
 message_api = APIRouter()
@@ -151,6 +152,29 @@ async def query_short_message(body_item: QueryMsgBodyItem):
     messages = list(map(handler_message_content, messages))
     return {'message': '获取数据成功!', 'messages': messages, 'page': body_item.page, 'total_count': len(total_messages)}
 
+
+@message_api.post('/add/')  # POST-添加一条短讯通数据
+async def add_short_message(body_item: AddMsgBodyItem):
+    # 解析用户保存数据
+    user_id, access = decipher_user_token(body_item.user_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='登录已过期,请重新登录!')
+    now_timestamp = int(datetime.datetime.now().timestamp())
+    shotmsg_add = jsonable_encoder(body_item)
+    shotmsg_add['create_time'] = int(datetime.datetime.strptime(body_item.create_time, '%Y-%m-%d').timestamp())
+    shotmsg_add['join_time'] = now_timestamp
+    shotmsg_add['update_time'] = now_timestamp
+    shotmsg_add['author_id'] = user_id
+    del shotmsg_add['user_token']
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "INSERT INTO work_short_message (create_time,join_time,update_time,author_id,content,msg_type,"
+            "effects,note) "
+            "VALUES (%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(content)s,%(msg_type)s,"
+            "%(effects)s,%(note)s);",
+            shotmsg_add
+        )
+    return {'message': '添加成功!'}
 
 @message_api.put('/audit/{msg_id}/')  # 修改一条短讯通的批注
 async def update_message_audit(msg_id: int, body_item: AuditMessageItem = Body(...)):

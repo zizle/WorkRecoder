@@ -6,12 +6,13 @@
 import datetime
 import pandas as pd
 from fastapi import APIRouter, UploadFile, Form, HTTPException, Body, Query
+from fastapi.encoders import jsonable_encoder
 from utils.encryption import decipher_user_token
 from utils.file_hands import date_column_converter
 from apis.tools import validate_operate_user, validate_date_range, filter_records
 from db import DBWorker
 from logger import logger
-from .validate_models import JoinTimeDelMsgItem, QueryMsgBodyItem
+from .validate_models import JoinTimeDelMsgItem, QueryMsgBodyItem, AddOndutyMsgItem
 
 onduty_api = APIRouter()
 
@@ -136,6 +137,28 @@ async def query_short_message(body_item: QueryMsgBodyItem):
     # 处理数据内容
     messages = list(map(handler_message_content, messages))
     return {'message': '获取数据成功!', 'messages': messages, 'page': body_item.page, 'total_count': len(total_messages)}
+
+
+@onduty_api.post('/add/')  # POST-添加一条短讯通数据
+async def add_short_message(body_item: AddOndutyMsgItem):
+    # 解析用户保存数据
+    user_id, access = decipher_user_token(body_item.user_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='登录已过期,请重新登录!')
+    now_timestamp = int(datetime.datetime.now().timestamp())
+    ondutymsg_add = jsonable_encoder(body_item)
+    ondutymsg_add['create_time'] = int(datetime.datetime.strptime(body_item.create_time, '%Y-%m-%d').timestamp())
+    ondutymsg_add['join_time'] = now_timestamp
+    ondutymsg_add['update_time'] = now_timestamp
+    ondutymsg_add['author_id'] = user_id
+    del ondutymsg_add['user_token']
+    with DBWorker() as (_, cursor):
+        cursor.execute(
+            "INSERT INTO work_onduty_message (create_time,join_time,update_time,author_id,content,note) "
+            "VALUES (%(create_time)s,%(join_time)s,%(update_time)s,%(author_id)s,%(content)s,%(note)s);",
+            ondutymsg_add
+        )
+    return {'message': '添加成功!'}
 
 
 @onduty_api.delete('/{msg_id}/')  # 删除一条值班信息
