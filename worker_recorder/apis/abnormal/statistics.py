@@ -41,11 +41,13 @@ async def get_year_statistics(query_date: str = Query(...)):
 
 
 @statistics_api.get('/year-total/')  # 按年累计请求者非常规工作数量(请求者=admin则为所有人的数量)
-async def get_user_year_total(user_token: str = Query(...)):
+async def get_user_year_total(user_token: str = Query(...),
+                              currency: str = Query(...)):
     # 解析出用户
     user_id, access = decipher_user_token(user_token)
     if not user_id:
         raise HTTPException(status_code=401, detail='登录过期,请重新登录!')
+    include_ids = list(map(int, currency.split(',')))
     # 获取日期范围(1月28日(含)之后就显示新一年的)
     current_year = get_current_year()
     start_timestamp, end_timestamp = get_year_range(current_year)
@@ -57,16 +59,20 @@ async def get_user_year_total(user_token: str = Query(...)):
     if record_df.empty:
         return {'message': '统计成功!', 'total_count': 0, 'percent': 0, 'month_count': []}
     total_count = record_df.shape[0]
-    if 'admin' in access:
-        detail_count_data = handle_abnormal_work_amount(record_df, 'year')
-        user_count = total_count
-        percent = 100 if total_count else 0
-    else:
-        # 选取用户的非常规工作
-        user_record_df = record_df[record_df['author_id'] == user_id]
-        detail_count_data = handle_abnormal_work_amount(user_record_df, 'year')
-        user_count = user_record_df.shape[0]
-        percent = round(user_count / total_count * 100, 2) if total_count else 0
+    # if 'admin' in access:
+    #     detail_count_data = handle_abnormal_work_amount(record_df, 'year')
+    #     user_count = total_count
+    #     percent = 100 if total_count else 0
+    # else:
+    #     # 选取用户的非常规工作
+    #     user_record_df = record_df[record_df['author_id'] == user_id]
+
+    # 获取查询的用户的数据
+    user_record_df = record_df[record_df['author_id'].isin(include_ids)]
+
+    detail_count_data = handle_abnormal_work_amount(user_record_df, 'year')
+    user_count = user_record_df.shape[0]
+    percent = round(user_count / total_count * 100, 2) if total_count else 0
     return {'message': '统计成功!', 'total_count': user_count, 'percent': percent, 'month_count': detail_count_data}
 
 
@@ -104,7 +110,6 @@ async def statistics_users_count(currency: str = Query(...),
                                  end_ts: int = Depends(validate_end_date),
                                  kw: str = Query(None)):
     """
-
     :param currency: 包含的所有id的字符串
     :param start_ts: 日期开始的时间戳
     :param end_ts: 日期结束的时间戳

@@ -157,7 +157,7 @@ async def modify_investment(investment_id: int,
 
 @investment_api.delete('/remove/{investment_id}/')  # 用户或管理者删除一条投资方案记录
 async def delete_investment_record(investment_id: int, user_token: str = Query(...)):
-    user_id, is_audit = validate_operate_user(user_token)
+    user_id, is_audit = validate_operate_user(user_token, 'admin')
     # 删除数据
     with DBWorker() as (_, cursor):
         cursor.execute('SELECT id,author_id,annex_url FROM work_investment WHERE id=%s;', (investment_id,))

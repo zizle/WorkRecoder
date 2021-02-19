@@ -119,7 +119,7 @@ async def modify_investment(article_id: int,
             body_content['annex'] = annex_file.filename
             body_content['annex_url'] = sql_path
             cursor.execute(
-                "UPDATE work_article SET media_name=%(media_name)s,checker=%(checker)s,"
+                "UPDATE work_article SET title=%(title)s,media_name=%(media_name)s,checker=%(checker)s,"
                 "allowance=%(allowance)s,partner=%(partner)s,score=%(score)s,note=%(note)s,"
                 "is_publish=%(is_publish)s,annex=%(annex)s,annex_url=%(annex_url)s "
                 "WHERE id=%(article_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
@@ -136,7 +136,7 @@ async def modify_investment(article_id: int,
         # 没有附件,只更新其他字段
         else:
             cursor.execute(
-                "UPDATE work_article SET media_name=%(media_name)s,checker=%(checker)s,"
+                "UPDATE work_article SET title=%(title)s,media_name=%(media_name)s,checker=%(checker)s,"
                 "allowance=%(allowance)s,partner=%(partner)s,score=%(score)s,note=%(note)s,"
                 "is_publish=%(is_publish)s "
                 "WHERE id=%(article_id)s AND IF(1=%(is_audit)s,TRUE,author_id=%(user_id)s)"
@@ -148,7 +148,7 @@ async def modify_investment(article_id: int,
 
 @article_api.delete('/remove/{article_id}/')  # 用户或管理者删除一条热点文章的记录
 async def delete_investment_record(article_id: int, user_token: str = Query(...)):
-    user_id, is_audit = validate_operate_user(user_token)
+    user_id, is_audit = validate_operate_user(user_token, 'admin')
     # 删除数据
     with DBWorker() as (_, cursor):
         cursor.execute('SELECT id,author_id,annex_url FROM work_article WHERE id=%s;', (article_id,))

@@ -38,17 +38,25 @@ async def get_month_revenue(query_date: str = Query(...)):  # 按年统计每人
 
 
 @statistics_api.get('/year-total/')  # 按年累计请求者的客户指标情况(请求者=admin则为所有人的客户情况)
-async def get_user_year_total(user_token: str = Query(...)):
+async def get_user_year_total(user_token: str = Query(...),
+                              currency: str = Query(...)):
     # 解析出用户
     user_id, access = decipher_user_token(user_token)
     if not user_id:
         raise HTTPException(status_code=401, detail='登录过期,请重新登录!')
+    include_ids = list(map(int, currency.split(',')))
     # 获取日期范围(1月28日(含)之后就显示新一年的)
     current_year = get_current_year()
     start_timestamp, end_timestamp = get_year_range(current_year)
     if start_timestamp == 0:
         raise HTTPException(status_code=400, detail='参数`query_date`错误:can not format `%Y-%m-01`.')
-    is_admin = 0 if 'admin' in access else user_id
+    # is_admin = 0 if 'admin' in access else user_id
+    is_admin = 0
     customers, revenues = get_customers_and_revenues(start_timestamp, end_timestamp, is_admin)
-    result = handle_customer_amount_revenue(pd.DataFrame(customers), pd.DataFrame(revenues))
+    c_df = pd.DataFrame(customers)
+    r_df = pd.DataFrame(revenues)
+    # 通过author_id选择需要的数据记录条目
+    c_df = c_df[c_df['author_id'].isin(include_ids)]
+    r_df = r_df[r_df['author_id'].isin(include_ids)]
+    result = handle_customer_amount_revenue(c_df, r_df)
     return {'message': '年统计成功!', 'statistics': result}

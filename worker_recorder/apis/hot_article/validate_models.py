@@ -47,6 +47,7 @@ class QueryArticleItem(BaseModel):
 class ArticleModifyBodyItem(BaseModel):
     user_token: str
     article_id: int
+    title: str
     media_name: str
     checker: str
     allowance: int
