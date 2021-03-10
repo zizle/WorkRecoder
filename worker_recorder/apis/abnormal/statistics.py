@@ -81,18 +81,17 @@ async def get_user_year_total(user_token: str = Query(...),
 
 def statistics_records(records):  # 进行记录的统计(以用户分组统计数量、瑞币、收入补贴、评级得分)
     record_df = pd.DataFrame(records)
-    # 过滤掉审核没通过的数据条目
     if record_df.empty:
         return [], []
-    # 只统计有效的工作记录
-    record_df = record_df[record_df['is_examined'] == 1]
-    if record_df.empty:
+    # 过滤掉审核没通过的数据条目，只统计有效的工作记录
+    statistics_df = record_df[record_df['is_examined'] == 1]
+    if statistics_df.empty:
         return [], []
     # 计算各人员的策略数量
-    amount_count_df = record_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
+    amount_count_df = statistics_df.groupby(['author_id', 'username'], as_index=False)['author_id'].agg(
         {'total_count': 'count'})
     # 统计其他字段
-    sum_df = record_df.groupby(by=['author_id'], as_index=False)[['swiss_coin', 'allowance', 'score']].sum()
+    sum_df = statistics_df.groupby(by=['author_id'], as_index=False)[['swiss_coin', 'allowance', 'score']].sum()
     # 将数据合并
     sum_df = pd.merge(amount_count_df, sum_df, on=['author_id'], how='left')
     return record_df.to_dict(orient='records'), sum_df.to_dict(orient='records')

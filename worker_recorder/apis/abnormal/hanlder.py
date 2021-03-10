@@ -47,6 +47,8 @@ def handle_abnormal_amount_score(abnormal_df):
 def handle_abnormal_work_amount(abnormal_df, s_type):
     if abnormal_df.empty:
         return []
+    # 选取有效的记录
+    abnormal_df = abnormal_df[abnormal_df['is_examined'] == 1]
     if s_type == 'month':
         timestamp_format = '%Y-%m-%d'
     elif s_type == 'year':
